@@ -336,7 +336,7 @@ function chip(c){
 function parseCountries(s){
   return String(s||'').split(/[,;\n]+/).map(function(x){x=x.trim();if(!x)return null;var m=x.match(/^([A-Za-z]{2,3})\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)?$/);if(!m)return null;return {code:m[1].toUpperCase(),roas:m[2]?parseFloat(m[2].replace(',','.')):null};}).filter(Boolean);
 }
-function pCountries(p){if(!p)return [];if(p.offer&&ROAS.loaded){return ROAS.rows.filter(function(r){return r.offer_id===p.offer;}).sort(function(a,b){return b.pauta-a.pauta;}).map(function(r){return {code:r.country,roas:r.roas};});}return p.countries||[];}
+function pCountries(p){if(!p)return [];if(p.offer&&ROAS.loaded){return ROAS.rows.filter(function(r){return r.offer_id===p.offer&&(!p.country||r.country===p.country);}).sort(function(a,b){return b.pauta-a.pauta;}).map(function(r){return {code:r.country,roas:r.roas};});}return p.countries||[];}
 function offerName(id){var o=ROAS.offers.find(function(x){return x.id===id;});return o?o.name:'';}
 function countriesText(cs){return (cs||[]).map(function(c){return c.code+(c.roas!=null?' '+c.roas:'');}).join(', ');}
 
@@ -377,8 +377,9 @@ function byId(col,id){return S[col].find(function(x){return x.id===id;});}
 
 /* ---------- derived ---------- */
 var STAGES=[['pdf','PDF'],['guiones','Guiones'],['videos','Videos'],['script','Script WhatsApp'],['campanas','Campañas']];
-function activeProducts(){return S.products.filter(function(p){return (p.status||'activo')==='activo';}).sort(function(a,b){return String(a.name).localeCompare(b.name);});}
-function productName(id){var p=byId('products',id);return p?p.name:'';}
+function activeProducts(){return S.products.filter(function(p){return (p.status||'activo')==='activo';}).sort(function(a,b){return pLabel(a).localeCompare(pLabel(b));});}
+function pLabel(p){return p?(p.name+(p.country?' '+p.country:'')):'';}
+function productName(id){return pLabel(byId('products',id));}
 var WARM_DAYS=12;
 function lineState(l){
   var st=l.status||'calentando';
@@ -439,7 +440,7 @@ function headerTools(extra){
 function searchResults(){
   var q=UI.search.trim().toLowerCase();if(q.length<2)return '';
   var r=[];
-  S.products.forEach(function(p){if(String(p.name).toLowerCase().indexOf(q)>=0)r.push({h:'#productos',id:p.id,k:'product',t:p.name,s:'Producto · '+(p.status||'activo')});});
+  S.products.forEach(function(p){if(pLabel(p).toLowerCase().indexOf(q)>=0)r.push({h:'#productos',id:p.id,k:'product',t:pLabel(p),s:'Producto · '+(p.status||'activo')});});
   S.lines.forEach(function(l){if(('línea '+l.num+' linea '+l.num+' '+(l.phone||'')).toLowerCase().indexOf(q)>=0)r.push({h:'#lineas',id:l.id,k:'line',t:'Línea '+l.num,s:lineState(l).status});});
   S.tasks.forEach(function(t){if(String(t.title).toLowerCase().indexOf(q)>=0)r.push({h:'#tareas',id:t.id,k:'task',t:t.title,s:'Tarea · '+t.status});});
   var h='<div class="results" role="listbox">';
@@ -509,11 +510,11 @@ function roasNote(){if(ROAS.error)return '<span style="color:var(--rfg,#9B2418)"
 function legend(){return '<div class="legend"><span>'+roasNote()+'</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--g)"></span>1.80 o más</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--a)"></span>1.43 a 1.79</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--r)"></span>1.42 o menos</span></div>';}
 function productMini(p){
   var cs=pCountries(p);
-  return '<button class="prow pm" data-a="editproduct" data-id="'+p.id+'"><span class="nm">'+esc(p.name)+'</span><span class="chips">'+(cs.length?cs.map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.offer?'Sin pauta':'Sin países')+'</span>')+'</span></button>';
+  return '<button class="prow pm" data-a="editproduct" data-id="'+p.id+'"><span class="nm">'+esc(pLabel(p))+'</span><span class="chips">'+(cs.length?cs.map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.country?p.country+' · ':'')+(p.offer?'Sin pauta':'Sin países')+'</span>')+'</span></button>';
 }
 function productRow(p){
   var meta=[];if(p.line)meta.push('Línea '+p.line);if(p.phone)meta.push(p.phone);if(p.avatar)meta.push('Avatar: '+p.avatar);
-  return '<button class="prow" data-a="editproduct" data-id="'+p.id+'"><div style="flex:1 1 220px;min-width:0"><div class="nm">'+esc(p.name)+'</div><div class="mt">'+esc(meta.join(' · ')||'Sin línea asignada')+'</div></div><div class="chips" style="flex:1 1 260px;justify-content:flex-end">'+(pCountries(p).length?pCountries(p).map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.offer?'Sin pauta en 3 días':'Sin países')+'</span>')+'</div></button>';
+  return '<button class="prow" data-a="editproduct" data-id="'+p.id+'"><div style="flex:1 1 220px;min-width:0"><div class="nm">'+esc(pLabel(p))+'</div><div class="mt">'+esc(meta.join(' · ')||'Sin línea asignada')+'</div></div><div class="chips" style="flex:1 1 260px;justify-content:flex-end">'+(pCountries(p).length?pCountries(p).map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.country?p.country+' · ':'')+(p.offer?'Sin pauta en 3 días':'Sin países')+'</span>')+'</div></button>';
 }
 function taskRow(t){
   var done=t.status==='Hecha';
@@ -536,8 +537,8 @@ function vProductos(){
 }
 function productCard(p){
   var st=p.stages||{};var done=STAGES.filter(function(s){return st[s[0]];}).length;
-  var h='<article class="pcard"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><h2>'+esc(p.name)+'</h2><button class="iconbtn sm" data-a="editproduct" data-id="'+p.id+'" aria-label="Editar '+esc(p.name)+'">'+ic('edit',16)+'</button></div>';
-  h+='<div class="chips">'+(pCountries(p).length?pCountries(p).map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.offer?'Sin pauta en 3 días':'Sin países')+'</span>')+(p.status&&p.status!=='activo'?'<span class="pill">'+esc(cap(p.status))+'</span>':'')+'</div>';
+  var h='<article class="pcard"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><h2>'+esc(pLabel(p))+'</h2><button class="iconbtn sm" data-a="editproduct" data-id="'+p.id+'" aria-label="Editar '+esc(pLabel(p))+'">'+ic('edit',16)+'</button></div>';
+  h+='<div class="chips">'+(pCountries(p).length?pCountries(p).map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.country?p.country+' · ':'')+(p.offer?'Sin pauta en 3 días':'Sin países')+'</span>')+(p.status&&p.status!=='activo'?'<span class="pill">'+esc(cap(p.status))+'</span>':'')+'</div>';
   var open=!!UI.pOpen[p.id];
   h+='<button type="button" class="pmore" data-a="pmore" data-id="'+p.id+'" aria-expanded="'+open+'">'+(open?'Ver menos':'Ver más')+ic(open?'up':'down',16)+'</button>';
   if(!open)return h+'</article>';
@@ -581,7 +582,7 @@ function vLineas(){
   h+='<section class="col"><div class="colhead"><h2>Vendiendo</h2><span class="count">'+sell.length+'</span></div><p class="sub" style="margin:0 0 4px">Cada una con su producto conectado.</p>';
   if(!sell.length)h+='<div class="empty">Ninguna línea vendiendo.</div>';
   sell.forEach(function(o){var l=o.l;var p=byId('products',l.product);var c=p&&pCountries(p)[0];
-    h+='<button class="litem" data-a="editline" data-id="'+l.id+'"><div style="min-width:0"><div class="n">Línea '+esc(l.num)+'</div><div class="m" style="color:var(--muted2)">'+esc(p?p.name:'Sin producto')+'</div></div>'+(c?'<span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><span class="dot" style="background:var(--'+tone(c.roas)+')"></span>'+esc(c.code)+' '+(c.roas!=null?(+c.roas).toFixed(2):'—')+'</span>':'')+'</button>';});
+    h+='<button class="litem" data-a="editline" data-id="'+l.id+'"><div style="min-width:0"><div class="n">Línea '+esc(l.num)+'</div><div class="m" style="color:var(--muted2)">'+esc(p?pLabel(p):'Sin producto')+'</div></div>'+(c?'<span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><span class="dot" style="background:var(--'+tone(c.roas)+')"></span>'+esc(c.code)+' '+(c.roas!=null?(+c.roas).toFixed(2):'—')+'</span>':'')+'</button>';});
   h+='</section></div>';
   h+='<section class="strip"><div style="display:flex;align-items:center;gap:12px"><span class="iconbtn sm" style="background:var(--bg);border:0;width:36px;height:36px;color:var(--muted2)">'+ic('lock',18)+'</span><div><div style="font-size:15px;font-weight:600">Bloqueadas y dadas de baja</div><div class="sub" style="margin:0">'+hidden.length+' '+(hidden.length===1?'línea oculta':'líneas ocultas')+'. No ocupan espacio hasta que las busques.</div></div></div><button class="btn ghost" data-a="toggleblocked" aria-expanded="'+UI.showBlocked+'">'+(UI.showBlocked?'Ocultar':'Mostrar')+ic(UI.showBlocked?'up':'down',16)+'</button></section>';
   if(UI.showBlocked&&hidden.length){h+='<div class="cols"><section class="col" style="flex-basis:100%">';hidden.forEach(function(o){var l=o.l;h+='<button class="litem" data-a="editline" data-id="'+l.id+'"><div><div class="n">Línea '+esc(l.num)+'</div><div class="m">'+esc([l.phone,l.note].filter(Boolean).join(' · '))+'</div></div><span class="pill">'+(o.s.status==='baja'?'Dada de baja':'Bloqueada')+'</span></button>';});h+='</section></div>';}
@@ -623,7 +624,7 @@ function taskDetail(t){
   h+='<label>Responsable<select data-c="tfield" data-f="who" data-id="'+t.id+'"><option value="">Sin asignar</option>'+m.map(function(x){return '<option'+(t.who===x?' selected':'')+'>'+esc(x)+'</option>';}).join('')+'</select></label>';
   h+='<label>Fecha límite<input type="date" data-c="tfield" data-f="due" data-id="'+t.id+'" value="'+esc(t.due||'')+'"></label>';
   h+='<label>Prioridad<select data-c="tfield" data-f="priority" data-id="'+t.id+'">'+['Alta','Media','Baja'].map(function(x){return '<option'+(t.priority===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>';
-  h+='<label>Producto<select data-c="tfield" data-f="product" data-id="'+t.id+'"><option value="">General</option>'+S.products.map(function(p){return '<option value="'+p.id+'"'+(t.product===p.id?' selected':'')+'>'+esc(p.name)+'</option>';}).join('')+'</select></label>';
+  h+='<label>Producto<select data-c="tfield" data-f="product" data-id="'+t.id+'"><option value="">General</option>'+S.products.map(function(p){return '<option value="'+p.id+'"'+(t.product===p.id?' selected':'')+'>'+esc(pLabel(p))+'</option>';}).join('')+'</select></label>';
   h+='<label>Etapa del producto<select data-c="tfield" data-f="stage" data-id="'+t.id+'"><option value="">Ninguna</option>'+STAGES.map(function(s){return '<option value="'+s[0]+'"'+(t.stage===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('')+'</select></label>';
   h+='</div>';
   if(t.notes)h+='<div class="comment">'+esc(t.notes)+'</div>';
@@ -697,7 +698,7 @@ function vAgentes(){
   h+='<section class="agents" aria-label="Lista de agentes">'+AGENTS.map(function(a){return '<button class="agent'+(a.id===ag.id?' sel':'')+'" data-a="agent" data-id="'+a.id+'" aria-pressed="'+(a.id===ag.id)+'"><span class="ai">'+ic('spark',20)+'</span><span><span class="an">'+esc(a.name)+'</span><span class="ad">'+esc(a.does)+'</span>'+(a.pending?'<span class="soon">En preparación</span>':'')+'</span></button>';}).join('')+'</section>';
   var prompt=agentPrompt(ag,UI.chatProduct);
   h+='<section class="chat" aria-label="Trabajar con el agente"><div class="cardhead"><div><h2 style="font-size:22px">'+esc(ag.name)+'</h2>';
-  h+='<label class="sub" style="display:flex;align-items:center;gap:6px">Producto: <select data-c="chatprod" style="border:0;background:var(--soft);border-radius:99px;padding:4px 10px;font-weight:600;color:var(--fg)"><option value="">Ninguno</option>'+activeProducts().map(function(p){return '<option value="'+p.id+'"'+(UI.chatProduct===p.id?' selected':'')+'>'+esc(p.name)+'</option>';}).join('')+'</select></label></div>';
+  h+='<label class="sub" style="display:flex;align-items:center;gap:6px">Producto: <select data-c="chatprod" style="border:0;background:var(--soft);border-radius:99px;padding:4px 10px;font-weight:600;color:var(--fg)"><option value="">Ninguno</option>'+activeProducts().map(function(p){return '<option value="'+p.id+'"'+(UI.chatProduct===p.id?' selected':'')+'>'+esc(pLabel(p))+'</option>';}).join('')+'</select></label></div>';
   if(SKILLS[ag.id])h+='<span class="pill">Skill: '+esc(SKILLS[ag.id])+'</span>';
   h+='</div>';
   h+='<p class="sub" style="margin:0">El agente trabaja en Claude con tu cuenta y sus skills. Abre el chat con este mensaje de inicio, completa lo que necesitas y, al terminar, Claude guarda la entrega aquí en el producto.</p>';
@@ -769,6 +770,7 @@ function productForm(p){
     {name:'phone',label:'Celular',value:p.phone,placeholder:'Cel. 3'},
     {name:'avatar',label:'Avatar',value:p.avatar,placeholder:'Nombre del avatar'},
     {name:'offer',label:'Oferta en el NUCLEA Dashboard',type:'select',value:p.offer||'',hint:'el ROAS por país se lee solo',options:[['','Sin conectar']].concat(ROAS.offers.filter(function(o){return !o.archived||o.id===p.offer;}).map(function(o){return [o.id,o.name];})).concat(p.offer&&!offerName(p.offer)?[[p.offer,'Oferta no encontrada']]:[])},
+    {name:'country',label:'País',value:p.country||'',placeholder:'CO',hint:'código de 2 letras; el ROAS se lee solo de este país'},
     {name:'countries',label:'Países y ROAS a mano',value:countriesText(p.countries),hint:'solo si no está conectado a una oferta',placeholder:'CO 1.55, BO 1.21'},
     {name:'stages',label:'Etapas listas',type:'checks',value:STAGES.filter(function(s){return (p.stages||{})[s[0]];}).map(function(s){return s[0];}),options:STAGES},
     {name:'lg',label:'Enlace a guiones',value:(p.links||{}).guiones,type:'url',placeholder:'https://'},
@@ -777,7 +779,7 @@ function productForm(p){
   ],submit:isNew?'Crear producto':'Guardar',
   onDelete:isNew?null:function(){if(!confirmTwice('delp'+p.id))return false;store.remove('products',p.id);toast('Producto borrado');return true;},deleteLabel:'Borrar producto',
   onSubmit:function(v){if(!v.name)return false;var st={};STAGES.forEach(function(s){st[s[0]]=v.stages.indexOf(s[0])>=0;});
-    var data={name:v.name,status:v.status,line:v.line,phone:v.phone,avatar:v.avatar,offer:v.offer,countries:parseCountries(v.countries),stages:st,links:{guiones:v.lg,videos:v.lv,drive:v.ld}};
+    var data={name:v.name,country:String(v.country||'').trim().toUpperCase().slice(0,3),status:v.status,line:v.line,phone:v.phone,avatar:v.avatar,offer:v.offer,countries:parseCountries(v.countries),stages:st,links:{guiones:v.lg,videos:v.lv,drive:v.ld}};
     if(isNew)store.add('products',data).then(function(){toast('Producto creado');});else store.update('products',p.id,data).then(function(){toast('Guardado');});
     if(v.line){var l=S.lines.find(function(x){return String(x.num)===v.line;});if(l&&isNew===false&&l.product!==p.id&&v.status==='activo')store.update('lines',l.id,{status:'vendiendo',product:p.id});}
     return true;}});
@@ -791,7 +793,7 @@ function taskForm(t,preset){
     {name:'who',label:'Responsable',type:'select',value:t.who||(isNew?UI.me:''),options:[['','Sin asignar']].concat(m)},
     {name:'priority',label:'Prioridad',type:'select',value:t.priority||'Media',options:['Alta','Media','Baja']},
     {name:'due',label:'Fecha límite',type:'date',value:t.due||''},
-    {name:'product',label:'Producto',type:'select',value:t.product||(preset&&preset.product)||'',options:[['','General']].concat(S.products.map(function(p){return [p.id,p.name];}))},
+    {name:'product',label:'Producto',type:'select',value:t.product||(preset&&preset.product)||'',options:[['','General']].concat(S.products.map(function(p){return [p.id,pLabel(p)];}))},
     {name:'stage',label:'Etapa del producto que completa',type:'select',value:t.stage||'',options:[['','Ninguna']].concat(STAGES)},
     {name:'notes',label:'Detalle',type:'textarea',value:t.notes,rows:3}
   ],submit:isNew?'Crear tarea':'Guardar',
@@ -802,18 +804,18 @@ function taskForm(t,preset){
 function setTaskStatus(t,s){
   var data={status:s};if(s==='Hecha'||s==='Descartada')data.doneAt=new Date().toISOString();
   store.update('tasks',t.id,data);
-  if(s==='Hecha'&&t.product&&t.stage){var p=byId('products',t.product);if(p){var st=Object.assign({},p.stages||{});if(!st[t.stage]){st[t.stage]=true;store.update('products',p.id,{stages:st});toast('Etapa marcada en '+p.name);}}}
+  if(s==='Hecha'&&t.product&&t.stage){var p=byId('products',t.product);if(p){var st=Object.assign({},p.stages||{});if(!st[t.stage]){st[t.stage]=true;store.update('products',p.id,{stages:st});toast('Etapa marcada en '+pLabel(p));}}}
 }
 function lineForm(l,assign){
   l=l||{};var isNew=!l.id;
-  if(assign){form({title:'Asignar producto a la línea '+l.num,fields:[{name:'product',label:'Producto',type:'select',value:'',options:activeProducts().map(function(p){return [p.id,p.name];})}],submit:'Asignar',
+  if(assign){form({title:'Asignar producto a la línea '+l.num,fields:[{name:'product',label:'Producto',type:'select',value:'',options:activeProducts().map(function(p){return [p.id,pLabel(p)];})}],submit:'Asignar',
     onSubmit:function(v){if(!v.product)return false;store.update('lines',l.id,{status:'vendiendo',product:v.product});store.update('products',v.product,{line:String(l.num),phone:byId('products',v.product).phone||l.phone||''});toast('Línea '+l.num+' vendiendo');return true;}});return;}
   form({title:isNew?'Nueva línea':'Línea '+l.num,fields:[
     {name:'num',label:'Número de línea',value:l.num,required:true,placeholder:'15'},
     {name:'phone',label:'Celular',value:l.phone,placeholder:'Cel. 2'},
     {name:'status',label:'Estado',type:'select',value:l.status||'calentando',options:[['calentando','En calentamiento'],['disponible','Disponible'],['vendiendo','Vendiendo'],['bloqueada','Bloqueada'],['baja','Dada de baja']]},
     {name:'warmStart',label:'Empezó a calentar el',type:'date',value:l.warmStart||iso(today())},
-    {name:'product',label:'Producto conectado',type:'select',value:l.product||'',options:[['','Ninguno']].concat(S.products.map(function(p){return [p.id,p.name];}))},
+    {name:'product',label:'Producto conectado',type:'select',value:l.product||'',options:[['','Ninguno']].concat(S.products.map(function(p){return [p.id,pLabel(p)];}))},
     {name:'note',label:'Nota',value:l.note}
   ],submit:isNew?'Crear línea':'Guardar',
   onDelete:isNew?null:function(){if(!confirmTwice('dell'+l.id))return false;store.remove('lines',l.id);return true;},deleteLabel:'Borrar línea',
@@ -886,9 +888,9 @@ function agentPrompt(ag,prodId){
   var t='';
   if(SKILLS[ag.id])t+='Usa la skill «'+SKILLS[ag.id]+'» y el conector Scriptorium.';
   else t+='Eres el '+ag.name.toLowerCase()+' del equipo. Usa el conector Scriptorium.';
-  if(p)t+=' Primero lee el producto «'+p.name+'» con ver_producto.';
+  if(p)t+=' Primero lee el producto «'+pLabel(p)+'» con ver_producto.';
   if(UI.me)t+=' Soy '+UI.me+'.';
-  t+=' Cuando terminemos cada entrega, ofréceme guardarla en Scriptorium con guardar_entrega (agente: '+ag.id+(p?', producto: '+p.name:'')+(UI.me?', autor: '+UI.me:'')+').';
+  t+=' Cuando terminemos cada entrega, ofréceme guardarla en Scriptorium con guardar_entrega (agente: '+ag.id+(p?', producto: '+pLabel(p):'')+(UI.me?', autor: '+UI.me:'')+').';
   return t+'\n\nLo que necesito: ';
 }
 function loadMcp(){return api('/api/mcp').then(function(r){MCP.loaded=true;MCP.url=r.url||null;scheduleRender();}).catch(function(){MCP.loaded=true;});}
@@ -945,7 +947,7 @@ document.addEventListener('click',function(ev){
     case 'rmatt':UI.atts.splice(+el.dataset.i,1);render();return;
     case 'copymsg':var c1=byId('chats',UI.chatId);var m1=c1&&c1.messages[+el.dataset.i];if(m1)copy(m1.content);return;
     case 'savedeliv':var c2=byId('chats',UI.chatId);var m2=c2&&c2.messages[+el.dataset.i];if(!m2)return;
-      form({title:'Guardar entrega',fields:[{name:'title',label:'Nombre de la entrega',value:c2.title||'Entrega',required:true},{name:'product',label:'Producto',type:'select',value:c2.product||'',options:[['','Sin producto']].concat(S.products.map(function(p){return [p.id,p.name];}))}],submit:'Guardar',
+      form({title:'Guardar entrega',fields:[{name:'title',label:'Nombre de la entrega',value:c2.title||'Entrega',required:true},{name:'product',label:'Producto',type:'select',value:c2.product||'',options:[['','Sin producto']].concat(S.products.map(function(p){return [p.id,pLabel(p)];}))}],submit:'Guardar',
         onSubmit:function(v){store.add('deliverables',{title:v.title,product:v.product,agent:c2.agent,content:m2.content,who:UI.me||''}).then(function(){toast('Entrega guardada');});return true;}});return;
     case 'opendeliv':var d1=byId('deliverables',id);if(!d1)return;openModal('<h2>'+esc(d1.title)+'</h2><p class="sub" style="margin:0">'+esc([productName(d1.product)||'Sin producto',agentById(d1.agent).name,d1.who||'',shortDate(String(d1.createdAt).slice(0,10))].filter(Boolean).join(' · '))+'</p>'+(d1.link?'<a class="btn ghost" style="align-self:flex-start" href="'+esc(safeUrl(d1.link))+'" target="_blank" rel="noopener">'+ic('link',16)+'Abrir archivo</a>':'')+'<div class="pre">'+esc(d1.content)+'</div><div class="mrow"><button type="button" class="btn danger sm" data-a="deldeliv" data-id="'+d1.id+'">Borrar</button><span class="spacer"></span><button type="button" class="btn ghost" data-a="copydeliv" data-id="'+d1.id+'">Copiar</button><button type="button" class="btn dark" data-a="mclose">Cerrar</button></div>',null);return;
     case 'copydeliv':var d2=byId('deliverables',id);if(d2)copy(d2.content);return;

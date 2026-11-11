@@ -13,7 +13,7 @@ const AGENTS = ["desarrollador", "creador", "editor", "investigador"] as const;
 const TASK_STATES = ["Pendiente", "En curso", "Hecha", "Descartada"] as const;
 const STAGES: Record<string, string> = { pdf: "PDF", guiones: "Guiones", videos: "Videos", script: "Script WhatsApp", campanas: "Campañas" };
 
-const productoProp = { type: "string", description: "Id o nombre del producto (basta una parte del nombre)" };
+const productoProp = { type: "string", description: "Id o nombre del producto con su país, por ejemplo 'PILATES CO' (basta una parte)" };
 
 export const TOOLS = [
   {
@@ -117,7 +117,7 @@ export const TOOLS = [
   },
   {
     name: "sincronizar_productos",
-    description: "Trae las ofertas del NUCLEA Dashboard como productos de Scriptorium: crea las que faltan (conectadas a su ROAS), enlaza productos con el mismo nombre y archiva los de ofertas archivadas. También corre sola cada hora.",
+    description: "Trae las ofertas del NUCLEA Dashboard como productos de Scriptorium, uno por oferta y país (cada uno con su ROAS): crea los que faltan, enlaza productos con el mismo nombre y archiva los de ofertas archivadas. También corre sola cada hora.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -161,19 +161,20 @@ export function findProduct(products: Item[], q: string): Item {
   if (!key) throw new ToolError("Falta el producto");
   const byId = products.find((p) => p.id === q.trim());
   if (byId) return byId;
-  const exact = products.filter((p) => str(p.data.name).toLowerCase() === key);
+  const label = (p: Item) => `${str(p.data.name)} ${str(p.data.country)}`.trim().toLowerCase();
+  const exact = products.filter((p) => label(p) === key);
   if (exact.length === 1) return exact[0];
-  const partial = products.filter((p) => str(p.data.name).toLowerCase().includes(key));
+  const partial = products.filter((p) => label(p).includes(key));
   if (partial.length === 1) return partial[0];
   if (!partial.length) throw new ToolError(`No encontré un producto que se llame "${q}". Usa listar_productos para ver los nombres.`);
-  throw new ToolError(`Hay varios productos parecidos a "${q}": ${partial.map((p) => p.data.name).join(", ")}. Di cuál.`);
+  throw new ToolError(`Hay varios productos parecidos a "${q}": ${partial.map((p) => `${p.data.name} ${str(p.data.country)}`.trim()).join(", ")}. Di cuál (por ejemplo con el país).`);
 }
 
 function countries(p: Item, roas: RoasPayload | null) {
-  const offer = str(p.data.offer);
+  const offer = str(p.data.offer), country = str(p.data.country).toUpperCase();
   if (offer && roas && !roas.error) {
     return roas.rows
-      .filter((r) => r.offer_id === offer)
+      .filter((r) => r.offer_id === offer && (!country || r.country === country))
       .sort((a, b) => b.pauta - a.pauta)
       .map((r) => ({ pais: r.country, roas: r.roas, semaforo: semaforo(r.roas), ventas: r.ventas, neto_cop: r.neto, pauta_cop: r.pauta }));
   }
@@ -186,7 +187,8 @@ function productSummary(p: Item, roas: RoasPayload | null, offers: Map<string, s
   const stages = (d.stages || {}) as Record<string, boolean>;
   return {
     id: p.id,
-    nombre: d.name,
+    nombre: d.country ? `${d.name} ${d.country}` : d.name,
+    pais: d.country || null,
     estado: d.status || "activo",
     linea: d.line || null,
     celular: d.phone || null,
@@ -209,7 +211,7 @@ export async function callTool(env: Env, name: string, args: Json): Promise<unkn
       const offers = new Map((roas?.offers || []).map((o) => [o.id, o.name]));
       const list = products
         .filter((p) => estado === "todos" || (p.data.status || "activo") === estado)
-        .sort((a, b) => str(a.data.name).localeCompare(str(b.data.name)))
+        .sort((a, b) => str(a.data.name).localeCompare(str(b.data.name)) || str(a.data.country).localeCompare(str(b.data.country)))
         .map((p) => productSummary(p, roas, offers));
       return { roas_periodo: roas ? `${roas.from} a ${roas.to}` : "no disponible", productos: list };
     }
@@ -241,7 +243,7 @@ export async function callTool(env: Env, name: string, args: Json): Promise<unkn
       let product = "", productName = "";
       if (str(args.producto)) {
         const p = findProduct(await items(env, "products"), str(args.producto));
-        product = p.id; productName = str(p.data.name);
+        product = p.id; productName = `${str(p.data.name)} ${str(p.data.country)}`.trim();
       }
       const link = str(args.enlace, 500);
       if (link && !/^https?:\/\//i.test(link)) throw new ToolError("El enlace debe empezar por https://");
@@ -255,7 +257,7 @@ export async function callTool(env: Env, name: string, args: Json): Promise<unkn
     case "listar_entregas": {
       const limite = Math.min(30, Math.max(1, Number(args.limite) || 10));
       const [delivs, products] = await Promise.all([items(env, "deliverables"), items(env, "products")]);
-      const names = new Map(products.map((p) => [p.id, str(p.data.name)]));
+      const names = new Map(products.map((p) => [p.id, `${str(p.data.name)} ${str(p.data.country)}`.trim()]));
       let list = delivs;
       if (str(args.producto)) { const p = findProduct(products, str(args.producto)); list = list.filter((d) => d.data.product === p.id); }
       if (str(args.agente)) list = list.filter((d) => d.data.agent === str(args.agente));
@@ -271,7 +273,7 @@ export async function callTool(env: Env, name: string, args: Json): Promise<unkn
     case "listar_tareas": {
       const estado = str(args.estado) || "abiertas";
       const [tasks, products] = await Promise.all([items(env, "tasks"), items(env, "products")]);
-      const names = new Map(products.map((p) => [p.id, str(p.data.name)]));
+      const names = new Map(products.map((p) => [p.id, `${str(p.data.name)} ${str(p.data.country)}`.trim()]));
       let list = tasks;
       if (estado === "abiertas") list = list.filter((t) => t.data.status === "Pendiente" || t.data.status === "En curso");
       else if (estado !== "todas") list = list.filter((t) => t.data.status === estado);
