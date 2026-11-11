@@ -1,6 +1,7 @@
 import type { Env } from "./env";
 import { db } from "./supabase";
 import { loadRoas, type RoasPayload } from "./roas";
+import { syncProducts } from "./sync";
 
 // Conector MCP de Scriptorium para Claude (conector personalizado).
 // URL: https://<tu-worker>/mcp/<MCP_KEY>  (o /mcp con cabecera Authorization: Bearer <MCP_KEY>)
@@ -113,6 +114,11 @@ export const TOOLS = [
       },
       required: ["fan_page"],
     },
+  },
+  {
+    name: "sincronizar_productos",
+    description: "Trae las ofertas del NUCLEA Dashboard como productos de Scriptorium: crea las que faltan (conectadas a su ROAS), enlaza productos con el mismo nombre y archiva los de ofertas archivadas. También corre sola cada hora.",
+    inputSchema: { type: "object", properties: {} },
   },
   {
     name: "ver_equipo",
@@ -328,6 +334,10 @@ export async function callTool(env: Env, name: string, args: Json): Promise<unkn
         date: today, source: str(args.origen, 60) || "Investigador", createdAt: new Date().toISOString(),
       });
       return { ok: true, id };
+    }
+
+    case "sincronizar_productos": {
+      try { return await syncProducts(env); } catch (e) { throw new ToolError(e instanceof Error ? e.message : "No se pudo sincronizar"); }
     }
 
     case "ver_equipo": {

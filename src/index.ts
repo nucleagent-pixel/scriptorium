@@ -2,6 +2,7 @@ import type { Env } from "./env";
 import { approved, currentMember } from "./auth";
 import { cachedRoas } from "./roas";
 import { handleMcp } from "./mcp";
+import { syncProducts } from "./sync";
 
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -46,5 +47,10 @@ export default {
       return json({ error: "Ruta no encontrada" }, 404);
     }
     return env.ASSETS.fetch(req);
+  },
+
+  // Cada hora: las ofertas nuevas del Dashboard aparecen como productos.
+  async scheduled(_c: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(syncProducts(env).then((r) => console.log("Sync productos", JSON.stringify(r))).catch((e) => console.error("Sync productos", e instanceof Error ? e.message : e)));
   },
 } satisfies ExportedHandler<Env>;
