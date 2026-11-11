@@ -506,7 +506,7 @@ function vInicio(){
   h+='<p class="foot">Lo apagado, bloqueado y terminado no aparece aquí.</p>';
   return h;
 }
-function roasNote(){if(ROAS.error)return '<span style="color:var(--rfg,#9B2418)">'+esc(ROAS.error)+'</span>';if(!ROAS.loaded)return 'Leyendo ROAS del Dashboard…';var t=new Date(ROAS.updatedAt);return 'ROAS del Dashboard, '+esc(shortDate(ROAS.from).toLowerCase())+' a '+esc(shortDate(ROAS.to).toLowerCase())+' · '+pad(t.getHours())+':'+pad(t.getMinutes());}
+function roasNote(){if(ROAS.error)return '<span style="color:var(--rfg,#9B2418)">'+esc(ROAS.error)+'</span>';if(!ROAS.loaded)return 'Leyendo ROAS del Dashboard…';var t=new Date(ROAS.updatedAt);return 'ROAS del Dashboard, '+(ROAS.from===ROAS.to?esc(shortDate(ROAS.to).toLowerCase()):esc(shortDate(ROAS.from).toLowerCase())+' a '+esc(shortDate(ROAS.to).toLowerCase()))+' · '+pad(t.getHours())+':'+pad(t.getMinutes());}
 function legend(){return '<div class="legend"><span>'+roasNote()+'</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--g)"></span>1.80 o más</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--a)"></span>1.43 a 1.79</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--r)"></span>1.42 o menos</span></div>';}
 function productMini(p){
   var cs=pCountries(p);

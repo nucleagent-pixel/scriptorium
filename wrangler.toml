@@ -13,6 +13,10 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*", "/mcp", "/mcp/*"]
 
+[vars]
+# El semáforo de ROAS cuenta desde esta fecha (ventana de 3 días que no empieza antes).
+ROAS_START = "2026-11-11"
+
 # Los secretos (SUPABASE_*, DASH_SUPABASE_*, MCP_KEY) se cargan en el panel de
 # Cloudflare (Settings → Variables and Secrets).
 

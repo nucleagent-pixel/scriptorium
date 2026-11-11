@@ -7,6 +7,8 @@ export interface Env {
   // Supabase del NUCLEA Dashboard (para leer el ROAS). Si no se ponen, se usa el mismo de arriba.
   DASH_SUPABASE_URL?: string;
   DASH_SUPABASE_KEY?: string;
+  // Fecha desde la que cuenta el ROAS (YYYY-MM-DD). La ventana es de 3 días pero no empieza antes.
+  ROAS_START?: string;
   // Clave del conector MCP para Claude (larga y aleatoria).
   MCP_KEY?: string;
 }

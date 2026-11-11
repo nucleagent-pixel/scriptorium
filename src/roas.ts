@@ -28,6 +28,17 @@ export function bogotaDate(now: Date, offsetDays = 0): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 }
 
+/**
+ * Ventana del semáforo: hoy y los 2 días anteriores (hora de Colombia), pero nunca
+ * antes de ROAS_START (YYYY-MM-DD), la fecha desde la que el equipo quiere contar.
+ */
+export function roasWindow(now: Date, start?: string): { from: string; to: string } {
+  const to = bogotaDate(now, 0);
+  let from = bogotaDate(now, -2);
+  if (start && /^\d{4}-\d{2}-\d{2}$/.test(start) && start > from) from = start > to ? to : start;
+  return { from, to };
+}
+
 /** ROAS = facturación neta ÷ pauta, por oferta y país. Sin pauta no hay ROAS. */
 export function toRoasRows(rows: RendimientoRow[]): RoasRow[] {
   return rows
@@ -48,8 +59,7 @@ export function toRoasRows(rows: RendimientoRow[]): RoasRow[] {
 
 /** ROAS de los últimos 3 días (hoy y los 2 anteriores, hora de Colombia) por producto y país. */
 export async function loadRoas(env: Env, now = new Date()): Promise<RoasPayload> {
-  const from = bogotaDate(now, -2);
-  const to = bogotaDate(now, 0);
+  const { from, to } = roasWindow(now, env.ROAS_START);
   const target = dashTarget(env);
   const [perf, offers] = await Promise.all([
     db<RendimientoRow[]>(env, "rpc/rendimiento", { method: "POST", body: JSON.stringify({ p_from: from, p_to: to }) }, target),

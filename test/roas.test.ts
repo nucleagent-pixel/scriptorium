@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bogotaDate, toRoasRows } from "../src/roas";
+import { bogotaDate, roasWindow, toRoasRows } from "../src/roas";
 
 describe("ROAS", () => {
   it("calcula neto ÷ pauta por oferta y país", () => {
@@ -18,5 +18,13 @@ describe("ROAS", () => {
     const now = new Date("2026-11-12T03:00:00Z");
     expect(bogotaDate(now)).toBe("2026-11-11");
     expect(bogotaDate(now, -2)).toBe("2026-11-09");
+  });
+
+  it("no cuenta antes de la fecha de inicio", () => {
+    const at = (d: string) => new Date(`${d}T17:00:00Z`);
+    expect(roasWindow(at("2026-11-11"), "2026-11-11")).toEqual({ from: "2026-11-11", to: "2026-11-11" });
+    expect(roasWindow(at("2026-11-12"), "2026-11-11")).toEqual({ from: "2026-11-11", to: "2026-11-12" });
+    expect(roasWindow(at("2026-11-20"), "2026-11-11")).toEqual({ from: "2026-11-18", to: "2026-11-20" });
+    expect(roasWindow(at("2026-11-20"))).toEqual({ from: "2026-11-18", to: "2026-11-20" });
   });
 });
