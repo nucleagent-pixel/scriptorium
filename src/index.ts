@@ -10,7 +10,7 @@ export default {
     const url = new URL(req.url);
     const path = url.pathname;
 
-    if (path === "/api/health") return json({ ok: true });
+    if (path === "/api/health") return json({ ok: true, app: "scriptorium", mcp: true });
 
     // Conector de Claude (MCP): /mcp/<MCP_KEY> o /mcp con Authorization: Bearer <MCP_KEY>
     const mcp = path.match(/^\/mcp(?:\/([^/]+))?\/?$/);
