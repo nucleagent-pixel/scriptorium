@@ -129,69 +129,71 @@ s = s[:old_who_start] + r"""function whoForm(){
 
 """ + s[old_who_end:]
 
-# ---------- chat de agentes: Claude por la API ----------
-old_chat_start = s.index("function sendChat(){")
+# ---------- agentes: se usan en Claude a través del conector MCP ----------
+old_chat_start = s.index("/* ---------- agents chat ---------- */")
 old_chat_end = s.index("/* ---------- events ---------- */")
-s = s[:old_chat_start] + r"""function sendChat(){
-  var text=UI.draft.trim();if((!text&&!UI.atts.length)||UI.pending)return;
-  var ag=agentById(UI.agent);var chat=UI.chatId&&byId('chats',UI.chatId);if(chat&&chat.agent!==ag.id)chat=null;
-  var prod=chat?chat.product:UI.chatProduct;
-  var texts=UI.atts.filter(function(a){return a.kind==='text';}),bins=UI.atts.filter(function(a){return a.kind!=='text';});
-  var full=text;texts.forEach(function(a){full+='\n\n--- Archivo adjunto: '+a.name+' ---\n'+a.text;});
-  var umsg={role:'user',content:text||'(ver adjuntos)',atts:UI.atts.map(function(a){return a.name;}),full:full,who:UI.me||'',at:new Date().toISOString()};
-  var history=(chat?chat.messages||[]:[]).concat([umsg]);
-  var turns=history.map(function(m,i){var t={role:m.role==='user'?'user':'assistant',text:m.full||m.content,who:m.role==='user'?m.who:undefined};
-    if(i===history.length-1&&bins.length)t.attachments=bins.map(function(a){return {kind:a.kind,name:a.name,media_type:a.type,data:a.data};});return t;});
-  UI.draft='';UI.atts=[];UI.pending=true;UI.streamText='';
-  var p=chat?store.update('chats',chat.id,{messages:history,updatedAt:umsg.at}).then(function(){return chat.id;}):store.add('chats',{agent:ag.id,product:prod||'',title:(text||umsg.atts[0]||'Chat').slice(0,60),messages:history,updatedAt:umsg.at});
-  var got='';
-  p.then(function(id){
-    if(!id)throw new Error('no-chat');
-    UI.chatId=id;render();
-    abortCtl=new AbortController();
-    return api('/api/agent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({agent:ag.id,context:productContext(prod).trim(),messages:turns}),signal:abortCtl.signal,raw:true}).then(function(res){
-      if(!res.ok)return res.json().catch(function(){return {};}).then(function(j){throw new Error(j.error||('HTTP '+res.status));});
-      var reader=res.body.getReader(),dec=new TextDecoder();
-      function pump(){return reader.read().then(function(r){if(r.done){got+=dec.decode();return;}got+=dec.decode(r.value,{stream:true});UI.streamText=got;
-        var el=document.getElementById('streaming');if(el){el.textContent=got;var m=document.getElementById('msgs');if(m)m.scrollTop=m.scrollHeight;}return pump();});}
-      return pump();
-    }).then(function(){
-      var c=byId('chats',id);var msgs=(c&&c.messages?c.messages:history).concat([{role:'assistant',content:got||'[Sin respuesta]',at:new Date().toISOString()}]);
-      UI.pending=false;return store.update('chats',id,{messages:msgs,updatedAt:new Date().toISOString()});
-    }).catch(function(e){
-      UI.pending=false;
-      if(e&&e.name==='AbortError')toast('Detenido');else toast(e&&e.message&&e.message!=='no-chat'&&e.message.length<120?e.message:'El agente no pudo responder. Intenta de nuevo.');
-      if(got){var cc=byId('chats',id);if(cc)store.update('chats',cc.id,{messages:(cc.messages||[]).concat([{role:'assistant',content:got+'\n\n[Incompleto]',at:new Date().toISOString()}])});}
-    });
-  }).catch(function(e){UI.pending=false;console.warn(e);toast('No se pudo iniciar el chat.');}).then(function(){render();});
+s = s[:old_chat_start] + r"""/* ---------- agents: en Claude con el conector MCP ---------- */
+var SKILLS={desarrollador:'desarrollo-de-producto',creador:'hada-creadora-de-producto',editor:'editar-reel'};
+var MCP={loaded:false,url:null};
+function agentPrompt(ag,prodId){
+  var p=byId('products',prodId);
+  var t='';
+  if(SKILLS[ag.id])t+='Usa la skill «'+SKILLS[ag.id]+'» y el conector Scriptorium.';
+  else t+='Eres el '+ag.name.toLowerCase()+' del equipo. Usa el conector Scriptorium.';
+  if(p)t+=' Primero lee el producto «'+p.name+'» con ver_producto.';
+  if(UI.me)t+=' Soy '+UI.me+'.';
+  t+=' Cuando terminemos cada entrega, ofréceme guardarla en Scriptorium con guardar_entrega (agente: '+ag.id+(p?', producto: '+p.name:'')+(UI.me?', autor: '+UI.me:'')+').';
+  return t+'\n\nLo que necesito: ';
 }
-var IMG_TYPES=['image/jpeg','image/png','image/gif','image/webp'];
-function readFiles(files){
-  Array.prototype.forEach.call(files,function(f){
-    var isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name),isImg=IMG_TYPES.indexOf(f.type)>=0;
-    if(isImg||isPdf){
-      var max=isImg?5:20;if(f.size>max*1024*1024){toast(f.name+' pesa más de '+max+' MB');return;}
-      var r=new FileReader();r.onload=function(){var d=String(r.result);UI.atts.push({kind:isImg?'image':'pdf',name:f.name,type:isImg?f.type:'application/pdf',data:d.slice(d.indexOf(',')+1)});render();};r.readAsDataURL(f);return;
-    }
-    if(/^(image|video|audio)\//.test(f.type)){toast(f.type.indexOf('image')===0?'Usa imágenes JPG, PNG, GIF o WebP':'Audio y video llegan en la siguiente fase');return;}
-    if(f.size>400*1024){toast(f.name+' es muy grande para el chat');return;}
-    var t=new FileReader();t.onload=function(){UI.atts.push({kind:'text',name:f.name,text:String(t.result)});render();};t.readAsText(f);
-  });
-}
+function loadMcp(){return api('/api/mcp').then(function(r){MCP.loaded=true;MCP.url=r.url||null;scheduleRender();}).catch(function(){MCP.loaded=true;});}
 
 """ + s[old_chat_end:]
 
-rep("else if(c==='atttext'){readFiles(el.files,'text');}\n  else if(c==='attimg'){if(!UI.imagesOk){toast('Las imágenes no están disponibles aquí. Adjunta texto.');return;}readFiles(el.files,'img');}",
-    "else if(c==='atttext'||c==='attimg'){readFiles(el.files);el.value='';}")
-rep("accept=\".txt,.md,.csv,.json,.srt,text/*\" multiple hidden>", "accept=\".pdf,.txt,.md,.csv,.json,.srt,application/pdf,text/*\" multiple hidden>")
-rep("title=\"Adjuntar texto\">'+ic('doc',18)+'<span class=\"sr\">Adjuntar documento de texto</span>",
-    "title=\"Adjuntar PDF o texto\">'+ic('doc',18)+'<span class=\"sr\">Adjuntar PDF o documento de texto</span>")
-rep("ic(a.kind==='img'?'img':'doc',14)", "ic(a.kind==='image'?'img':'doc',14)")
-rep("'<button type=\"submit\" class=\"btn dark\"'+(sample?'':' disabled title=\"El chat necesita abrir la página con tu cuenta de Claude\"')+'>Enviar</button>'",
-    "'<button type=\"submit\" class=\"btn dark\">Enviar</button>'")
-rep("Puedes adjuntar textos (.txt, .md, .csv) e imágenes.", "Puedes adjuntar PDF, textos (.txt, .md, .csv) e imágenes.")
-rep("Por ahora el chat acepta texto, documentos de texto e imágenes. Video y audio llegan en la siguiente versión.",
-    "El chat acepta texto, PDF, documentos de texto e imágenes. Audio y video llegan en la siguiente fase.")
+old_va_start = s.index("function vAgentes(){")
+old_va_end = s.index("/* ---------- render ---------- */")
+s = s[:old_va_start] + r"""function vAgentes(){
+  var ag=agentById(UI.agent);
+  var h=top('Trabajan en Claude con el contexto de Scriptorium','Agentes','');
+  h+=banners();
+  h+='<div class="row" style="align-items:flex-start">';
+  h+='<section class="agents" aria-label="Lista de agentes">'+AGENTS.map(function(a){return '<button class="agent'+(a.id===ag.id?' sel':'')+'" data-a="agent" data-id="'+a.id+'" aria-pressed="'+(a.id===ag.id)+'"><span class="ai">'+ic('spark',20)+'</span><span><span class="an">'+esc(a.name)+'</span><span class="ad">'+esc(a.does)+'</span>'+(a.pending?'<span class="soon">En preparación</span>':'')+'</span></button>';}).join('')+'</section>';
+  var prompt=agentPrompt(ag,UI.chatProduct);
+  h+='<section class="chat" aria-label="Trabajar con el agente"><div class="cardhead"><div><h2 style="font-size:22px">'+esc(ag.name)+'</h2>';
+  h+='<label class="sub" style="display:flex;align-items:center;gap:6px">Producto: <select data-c="chatprod" style="border:0;background:var(--soft);border-radius:99px;padding:4px 10px;font-weight:600;color:var(--fg)"><option value="">Ninguno</option>'+activeProducts().map(function(p){return '<option value="'+p.id+'"'+(UI.chatProduct===p.id?' selected':'')+'>'+esc(p.name)+'</option>';}).join('')+'</select></label></div>';
+  if(SKILLS[ag.id])h+='<span class="pill">Skill: '+esc(SKILLS[ag.id])+'</span>';
+  h+='</div>';
+  h+='<p class="sub" style="margin:0">El agente trabaja en Claude con tu cuenta y sus skills. Abre el chat con este mensaje de inicio, completa lo que necesitas y, al terminar, Claude guarda la entrega aquí en el producto.</p>';
+  h+='<div class="pre" style="margin:0">'+esc(prompt)+'</div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn dark" href="https://claude.ai/new?q='+encodeURIComponent(prompt)+'" target="_blank" rel="noopener">'+ic('arrow',16)+'Abrir en Claude</a><button type="button" class="btn ghost" data-a="copyprompt">Copiar mensaje</button></div>';
+  h+='<details class="howto"><summary style="cursor:pointer;font-weight:600">Primera vez: conectar Scriptorium a Claude</summary><ol style="margin:10px 0 0;padding-left:20px;line-height:1.6;color:var(--muted2);font-size:14px">';
+  h+='<li>En Claude, ve a <b>Configuración → Conectores</b> y toca <b>Agregar conector personalizado</b>.</li>';
+  h+='<li>Nombre: <b>Scriptorium</b>. URL: '+(MCP.url?'<span style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap"><code style="word-break:break-all">'+esc(MCP.url.replace(/\/mcp\/.+$/,'/mcp/•••••'))+'</code><button type="button" class="btn ghost sm" data-a="copymcp">Copiar URL</button></span>':(MCP.loaded?'<i>falta configurar MCP_KEY en Cloudflare (pídeselo a un admin)</i>':'cargando…'))+'</li>';
+  h+='<li>Guarda. En cada chat nuevo, activa el conector Scriptorium y la skill del agente.</li></ol>';
+  h+='<p class="sub" style="margin:8px 0 0">La URL es una clave: no la compartas fuera del equipo.</p></details>';
+  h+='</section>';
+  var dl=S.deliverables.slice().sort(function(a,b){return String(b.createdAt).localeCompare(String(a.createdAt));});
+  if(UI.delivFor)dl=dl.filter(function(d){return d.product===UI.delivFor;});
+  h+='<aside class="saved-list" aria-label="Entregas guardadas"><h2 style="font-size:20px">Entregas guardadas</h2><p class="sub" style="margin:0">'+(UI.delivFor?'De '+esc(productName(UI.delivFor))+'. <button class="link u" data-a="delivall">Ver todas</button>':'Todo lo que entregan los agentes queda en su producto.')+'</p>';
+  if(!dl.length)h+='<div class="empty">Todavía no hay entregas guardadas. Llegan aquí cuando Claude las guarda con el conector.</div>';
+  dl.slice(0,30).forEach(function(d){h+='<button class="sitem" data-a="opendeliv" data-id="'+d.id+'"><div class="st">'+esc(d.title)+'</div><div class="sm">'+esc([productName(d.product)||'Sin producto',agentById(d.agent).name.split(' ')[0],d.who||'',shortDate(String(d.createdAt).slice(0,10)).toLowerCase()].filter(Boolean).join(' · '))+'</div></button>';});
+  h+='</aside></div>';
+  h+='<p class="foot">Los agentes corren en Claude con sus skills: los archivos (guiones, PDF, imágenes, clips) se suben allá, en el chat.</p>';
+  return h;
+}
+
+""" + s[old_va_end:]
+
+rep("    case 'agent':UI.agent=id;UI.chatId=null;render();return;",
+    "    case 'agent':UI.agent=id;UI.chatId=null;render();return;\n"
+    "    case 'copyprompt':copy(agentPrompt(agentById(UI.agent),UI.chatProduct));return;\n"
+    "    case 'copymcp':if(MCP.url)copy(MCP.url);return;")
+rep("else if(c==='chatprod'){UI.chatProduct=el.value;}", "else if(c==='chatprod'){UI.chatProduct=el.value;render();}")
+rep("  else if(c==='atttext'){readFiles(el.files,'text');}\n  else if(c==='attimg'){if(!UI.imagesOk){toast('Las imágenes no están disponibles aquí. Adjunta texto.');return;}readFiles(el.files,'img');}\n", "")
+rep("  if(f.dataset.f==='chat'){var ta=document.getElementById('msg');UI.draft=ta?ta.value:UI.draft;sendChat();return;}\n", "")
+rep("  if(ev.target.id==='msg'&&ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();UI.draft=ev.target.value;sendChat();}\n", "")
+rep("    case 'stop':if(abortCtl)abortCtl.abort();return;\n", "")
+rep("[productName(d1.product)||'Sin producto',agentById(d1.agent).name,shortDate(String(d1.createdAt).slice(0,10))].join(' · '))+'</p>",
+    "[productName(d1.product)||'Sin producto',agentById(d1.agent).name,d1.who||'',shortDate(String(d1.createdAt).slice(0,10))].filter(Boolean).join(' · '))+'</p>'+(d1.link?'<a class=\"btn ghost\" style=\"align-self:flex-start\" href=\"'+esc(safeUrl(d1.link))+'\" target=\"_blank\" rel=\"noopener\">'+ic('link',16)+'Abrir archivo</a>':'')+'")
 
 # ---------- arranque: login + datos en vivo ----------
 old_boot_start = s.index("/* ---------- boot ---------- */")
@@ -267,7 +269,7 @@ var roasTimer=null,booted=false;
 function bootData(){
   hideGate();route();
   loadAll().then(function(){if(!booted){booted=true;subscribe();}}).catch(function(e){console.warn(e);showGate('error','No se pudieron leer los datos del equipo.');});
-  loadRoas();clearInterval(roasTimer);roasTimer=setInterval(loadRoas,10*60*1000);
+  loadRoas();loadMcp();clearInterval(roasTimer);roasTimer=setInterval(loadRoas,10*60*1000);
 }
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&ME&&ME.role!=='pendiente'&&Date.now()-lastLoad>5*60*1000){loadAll().catch(function(){});loadRoas();}});
 function onSession(session,force){

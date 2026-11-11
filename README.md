@@ -8,9 +8,23 @@ Corre en **Cloudflare Workers** (página + API) con **Supabase** como base de da
 - **Login por persona** con correo y contraseña. La primera persona que entra queda como **admin**; las demás quedan **pendientes** hasta que un admin las aprueba desde su avatar (arriba a la derecha) → *Tu cuenta*.
 - **Datos compartidos en vivo**: lo que una persona cambia lo ven las demás sin recargar.
 - **Semáforo de ROAS automático**: cada producto se conecta a una oferta del NUCLEA Dashboard y muestra el ROAS por país de los últimos 3 días (hoy y los 2 anteriores, hora de Colombia). ROAS = facturación neta ÷ pauta. Verde 1.80 o más, ámbar 1.43 a 1.79, rojo 1.42 o menos; bajo 1.25 aparece *apagar*. Se refresca cada 10 minutos. Un producto sin oferta conectada puede llevar el ROAS a mano.
-- **Agentes** con Claude: texto, PDF, documentos de texto e imágenes. Las entregas se guardan en el producto.
+- **Agentes en Claude con el conector MCP**: cada agente se usa dentro de Claude con su skill (desarrollo de producto, creadora de producto, editar reel) y la suscripción de cada persona. Con el conector, Claude lee productos, ROAS y tareas de Scriptorium y guarda las entregas de vuelta en el producto. La pantalla Agentes arma el mensaje de inicio, abre Claude y muestra las entregas guardadas.
 
-Siguientes fases: agentes con sus skills y adjuntos de audio y video; sincronización con Google Calendar.
+Siguiente fase: sincronización con Google Calendar.
+
+## Conector MCP (para Claude)
+
+URL: `https://<tu-worker>/mcp/<MCP_KEY>`. Cualquier persona aprobada la puede copiar en Agentes → *Primera vez: conectar Scriptorium a Claude*.
+
+| Herramienta | Qué hace |
+|---|---|
+| `listar_productos` | Productos con línea, avatar, etapas y ROAS por país (3 días) con semáforo |
+| `ver_producto` | Ficha completa: enlaces, tareas abiertas y entregas anteriores |
+| `guardar_entrega` | Guarda lo que hizo un agente en el producto (con enlace opcional a Drive) |
+| `listar_entregas` | Entregas guardadas, con o sin el texto |
+| `listar_tareas`, `crear_tarea`, `actualizar_tarea` | Tareas del equipo |
+| `registrar_hallazgo` | Anunciante modelable para Productos → Encontrados |
+| `ver_equipo` | Nombres del equipo para asignar tareas |
 
 ## Instalación
 
@@ -32,7 +46,7 @@ Scriptorium puede usar **el mismo proyecto de Supabase del Dashboard** (un solo 
    | `SUPABASE_URL` | URL del proyecto, solo `https://xxxx.supabase.co` |
    | `SUPABASE_ANON_KEY` | llave anon |
    | `SUPABASE_SERVICE_ROLE_KEY` | llave service_role (secreta) |
-   | `ANTHROPIC_API_KEY` | clave de la API de Anthropic para los agentes |
+   | `MCP_KEY` | clave larga y aleatoria del conector de Claude (mínimo 24 caracteres; por ejemplo, genera una en [passwordsgenerator.net](https://passwordsgenerator.net) con 40 letras y números, sin símbolos) |
    | `DASH_SUPABASE_URL` | **solo si** el Dashboard está en otro proyecto: su URL |
    | `DASH_SUPABASE_KEY` | **solo si** el Dashboard está en otro proyecto: su llave service_role |
 
@@ -43,6 +57,7 @@ Scriptorium puede usar **el mismo proyecto de Supabase del Dashboard** (un solo 
 1. Abre la URL del Worker → **Crear cuenta**. Serás el admin.
 2. El equipo crea su cuenta; tú los apruebas en tu avatar → *Tu cuenta* → *Acceso* = Equipo.
 3. En **Productos**, edita cada producto y elige su **Oferta en el NUCLEA Dashboard**.
+4. Cada persona agrega el conector en Claude: Agentes → *Primera vez: conectar Scriptorium a Claude*.
 
 ## Desarrollo
 

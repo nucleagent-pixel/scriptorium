@@ -7,8 +7,6 @@ export interface Env {
   // Supabase del NUCLEA Dashboard (para leer el ROAS). Si no se ponen, se usa el mismo de arriba.
   DASH_SUPABASE_URL?: string;
   DASH_SUPABASE_KEY?: string;
-  // Agentes.
-  ANTHROPIC_API_KEY?: string;
-  AGENT_MODEL?: string;
-  AGENT_EFFORT?: string;
+  // Clave del conector MCP para Claude (larga y aleatoria).
+  MCP_KEY?: string;
 }

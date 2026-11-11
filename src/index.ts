@@ -1,7 +1,7 @@
 import type { Env } from "./env";
 import { approved, currentMember } from "./auth";
 import { cachedRoas } from "./roas";
-import { handleAgent } from "./agents";
+import { handleMcp } from "./mcp";
 
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 
@@ -11,6 +11,10 @@ export default {
     const path = url.pathname;
 
     if (path === "/api/health") return json({ ok: true });
+
+    // Conector de Claude (MCP): /mcp/<MCP_KEY> o /mcp con Authorization: Bearer <MCP_KEY>
+    const mcp = path.match(/^\/mcp(?:\/([^/]+))?\/?$/);
+    if (mcp) return handleMcp(req, env, mcp[1] ? decodeURIComponent(mcp[1]) : null);
 
     // Datos públicos que necesita la página para iniciar sesión con Supabase.
     if (path === "/api/config") {
@@ -33,10 +37,10 @@ export default {
         return json(await cachedRoas(env, ctx));
       }
 
-      // Chat con un agente.
-      if (path === "/api/agent") {
-        if (req.method !== "POST") return json({ error: "Usa POST" }, 405);
-        return handleAgent(req, env, me, ctx);
+      // URL del conector MCP para que el equipo lo agregue en Claude.
+      if (path === "/api/mcp") {
+        const ok = env.MCP_KEY && env.MCP_KEY.length >= 24;
+        return json({ url: ok ? `${url.origin}/mcp/${encodeURIComponent(env.MCP_KEY as string)}` : null });
       }
 
       return json({ error: "Ruta no encontrada" }, 404);
