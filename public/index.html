@@ -97,9 +97,13 @@ h1{margin-top:6px;font-size:44px;line-height:1.05;letter-spacing:-.02em}
 .check.on{background:var(--ink);border-color:var(--ink)}
 .task .tt{font-size:14px;font-weight:500;line-height:1.35;border:0;background:transparent;padding:0;text-align:left}
 .task .tm{font-size:12px;color:var(--muted);margin-top:4px}
-.notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
-.note{height:156px;border-radius:18px;background:#F7F7F1;border:1px solid #E4E5DE;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
-.note p{margin:0;font-size:13px;line-height:1.45;flex:1;overflow:hidden;white-space:pre-wrap;word-break:break-word}
+.notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:18px;padding:6px 2px 4px}
+.note{position:relative;height:170px;border-radius:3px 3px 3px 22px;background:var(--pi,#FFF3A6);padding:22px 16px 12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 1px rgba(0,0,0,.06),0 8px 14px -8px rgba(0,0,0,.28);transform:rotate(var(--rot,0deg));transition:transform .15s ease,box-shadow .15s ease;color:#2A2A22}
+.note:hover{transform:rotate(0deg) translateY(-2px);box-shadow:0 2px 2px rgba(0,0,0,.06),0 14px 22px -10px rgba(0,0,0,.32)}
+.note::before{content:"";position:absolute;top:-9px;left:50%;width:62px;height:20px;margin-left:-31px;background:rgba(225,225,215,.7);border:1px solid rgba(0,0,0,.04);transform:rotate(-2deg);border-radius:2px}
+.note::after{content:"";position:absolute;left:0;bottom:0;width:22px;height:22px;border-radius:0 0 0 22px;background:linear-gradient(45deg,rgba(0,0,0,.10),rgba(0,0,0,0) 60%)}
+.note p{margin:0;font-size:14px;line-height:1.45;flex:1;overflow:hidden;white-space:pre-wrap;word-break:break-word;font-weight:500}
+.note .link{align-self:flex-end;color:inherit;opacity:.7}
 .meeting{background:var(--ink);color:var(--inkfg);border-radius:28px;padding:24px 28px;display:flex;flex-direction:column;gap:14px}
 .meeting .lbl{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#BDBDB6}
 .meeting .ttl{font-family:var(--display);font-size:24px;font-weight:500}
@@ -468,7 +472,7 @@ function vInicio(){
   var notes=S.notes.filter(function(n){return !me||n.who===me;}).sort(function(a,b){return String(b.createdAt).localeCompare(String(a.createdAt));});
   h+='<section class="card grow2"><div class="cardhead" style="align-items:center"><h2>'+(me?'Mis post-it':'Post-it')+'</h2><button class="btn ghost" data-a="newnote">'+ic('plus',16)+'Nuevo</button></div>';
   if(!notes.length)h+='<div class="empty">Sin post-it. Anota aquí lo que no quieres olvidar.</div>';
-  else{h+='<div class="notes">';notes.forEach(function(n){h+='<div class="note"><p>'+esc(n.text)+'</p><button class="link u" data-a="opennote" data-id="'+n.id+'">Ver más</button></div>';});h+='</div>';}
+  else{h+='<div class="notes">';notes.forEach(function(n){var k=noteLook(n.id);h+='<div class="note" style="--pi:'+k.c+';--rot:'+k.r+'deg"><p>'+esc(n.text)+'</p><button class="link u" data-a="opennote" data-id="'+n.id+'">Ver más</button></div>';});h+='</div>';}
   h+='</section>';
   // my tasks
   var mt=myTasks().sort(taskSort);
@@ -485,7 +489,7 @@ function vInicio(){
   h+='<div class="row">';
   // products
   var ps=activeProducts();
-  h+='<section class="card grow2"><div class="cardhead"><div><h2>Productos activos</h2><p class="sub">ROAS de los últimos 3 días, por país</p></div>'+legend()+'</div><div class="pmini">';
+  h+='<section class="card grow2"><div class="cardhead"><div><h2>Productos activos</h2><p class="sub">ROAS por país</p></div>'+legend()+'</div><div class="pmini">';
   if(!ps.length)h+='<div class="empty">Todavía no hay productos activos.<button class="btn ghost" data-a="newproduct">'+ic('plus',16)+'Nuevo producto</button></div>';
   ps.forEach(function(p){h+=productMini(p);});
   h+='</div><a class="link" href="#productos">Ver todos los productos '+ic('arrow',14)+'</a></section>';
@@ -506,6 +510,7 @@ function vInicio(){
   h+='<p class="foot">Lo apagado, bloqueado y terminado no aparece aquí.</p>';
   return h;
 }
+function noteLook(id){var x=0,t=String(id||'');for(var i=0;i<t.length;i++)x=(x*31+t.charCodeAt(i))>>>0;var C=['#FFF3A6','#FFD9E4','#E3F6B5','#D6ECFF','#FFE2C2'];var R=[-2,1.5,-1,2,-0.5];return {c:C[x%5],r:R[(x>>3)%5]};}
 function roasNote(){if(ROAS.error)return '<span style="color:var(--rfg,#9B2418)">'+esc(ROAS.error)+'</span>';if(!ROAS.loaded)return 'Leyendo ROAS del Dashboard…';var t=new Date(ROAS.updatedAt);return 'ROAS del Dashboard, '+(ROAS.from===ROAS.to?esc(shortDate(ROAS.to).toLowerCase()):esc(shortDate(ROAS.from).toLowerCase())+' a '+esc(shortDate(ROAS.to).toLowerCase()))+' · '+pad(t.getHours())+':'+pad(t.getMinutes());}
 function legend(){return '<div class="legend"><span>'+roasNote()+'</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--g)"></span>1.80 o más</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--a)"></span>1.43 a 1.79</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--r)"></span>1.42 o menos</span></div>';}
 function productMini(p){
@@ -524,7 +529,7 @@ function taskRow(t){
 function vProductos(){
   var act=activeProducts(),found=S.found.filter(function(f){return !f.converted;}),off=S.products.filter(function(p){return p.status==='apagado'||p.status==='archivado';});
   var tabs='<div class="tabs" role="tablist" aria-label="Vista">'+[['activos','Activos '+act.length],['encontrados','Encontrados '+found.length],['apagados','Apagados y archivados '+off.length]].map(function(t){return '<button role="tab" aria-selected="'+(UI.ptab===t[0])+'" data-a="ptab" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
-  var h=top(act.length+' activos · ROAS de los últimos 3 días','Productos',tabs+'<button class="btn" data-a="newproduct">'+ic('plus',18)+'Nuevo producto</button>');
+  var h=top(act.length+' activos · ROAS por país','Productos',tabs+'<button class="btn" data-a="newproduct">'+ic('plus',18)+'Nuevo producto</button>');
   h+=banners();
   if(UI.ptab==='activos'||UI.ptab==='apagados'){
     var list=UI.ptab==='activos'?act:off;
