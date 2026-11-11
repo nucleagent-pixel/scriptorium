@@ -44,7 +44,7 @@ async function call(name: string, args: Record<string, unknown> = {}, key = KEY)
 
 describe("conector MCP", () => {
   it("rechaza una clave equivocada", async () => {
-    expect((await call("ver_equipo", {}, "mala")).status).toBe(401);
+    expect((await call("ver_equipo", {}, "mala")).status).toBe(403);
   });
 
   it("lista herramientas", async () => {

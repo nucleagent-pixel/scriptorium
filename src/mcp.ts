@@ -395,7 +395,9 @@ export async function handleMcp(req: Request, env: Env, pathKey: string | null):
   const bearer = req.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? null;
   const key = pathKey ?? bearer;
   if (!env.MCP_KEY || env.MCP_KEY.length < 24 || !key || !safeEqual(key, env.MCP_KEY)) {
-    return Response.json({ error: "Clave del conector inválida" }, { status: 401 });
+    // 403 y no 401: con 401 Claude intenta iniciar sesión por OAuth, y este conector usa la clave en la URL.
+    const why = !env.MCP_KEY || env.MCP_KEY.length < 24 ? "Falta MCP_KEY (24 caracteres o más) en Cloudflare" : "Clave del conector inválida: revisa la URL";
+    return Response.json({ error: why }, { status: 403 });
   }
   if (req.method === "GET") return new Response(null, { status: 405, headers: { Allow: "POST" } });
   if (req.method === "DELETE") return new Response(null, { status: 204 });
