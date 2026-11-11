@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
 
+# No borrar las variables que se cargan en el panel de Cloudflare al publicar.
+keep_vars = true
+
 # La página (HTML/JS) se sirve desde /public. Las rutas /api/* las atiende el Worker.
 [assets]
 directory = "./public"
