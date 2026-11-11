@@ -39,7 +39,7 @@ export default {
 
       // URL del conector MCP para que el equipo lo agregue en Claude.
       if (path === "/api/mcp") {
-        const ok = env.MCP_KEY && env.MCP_KEY.length >= 24;
+        const ok = env.MCP_KEY && env.MCP_KEY.length >= 16;
         return json({ url: ok ? `${url.origin}/mcp/${encodeURIComponent(env.MCP_KEY as string)}` : null });
       }
 

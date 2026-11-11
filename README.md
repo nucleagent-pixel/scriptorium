@@ -46,7 +46,7 @@ Scriptorium puede usar **el mismo proyecto de Supabase del Dashboard** (un solo 
    | `SUPABASE_URL` | URL del proyecto, solo `https://xxxx.supabase.co` |
    | `SUPABASE_ANON_KEY` | llave anon |
    | `SUPABASE_SERVICE_ROLE_KEY` | llave service_role (secreta) |
-   | `MCP_KEY` | clave larga y aleatoria del conector de Claude (mínimo 24 caracteres; por ejemplo, genera una en [passwordsgenerator.net](https://passwordsgenerator.net) con 40 letras y números, sin símbolos) |
+   | `MCP_KEY` | clave larga y aleatoria del conector de Claude (mínimo 16 caracteres; por ejemplo, genera una en [passwordsgenerator.net](https://passwordsgenerator.net) con 40 letras y números, sin símbolos) |
    | `DASH_SUPABASE_URL` | **solo si** el Dashboard está en otro proyecto: su URL |
    | `DASH_SUPABASE_KEY` | **solo si** el Dashboard está en otro proyecto: su llave service_role |
 
