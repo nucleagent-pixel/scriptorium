@@ -117,7 +117,7 @@ export const TOOLS = [
   },
   {
     name: "sincronizar_productos",
-    description: "Trae las ofertas del NUCLEA Dashboard como productos de Scriptorium: crea las que faltan (conectadas a su ROAS), enlaza productos con el mismo nombre y archiva los de ofertas archivadas. También corre sola cada hora.",
+    description: "Trae las ofertas del NUCLEA Dashboard como productos de Scriptorium: crea un producto por cada país donde se vende la oferta (cada uno con su propio ROAS), enlaza productos con el mismo nombre y archiva los de ofertas archivadas. También corre sola cada hora.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -171,9 +171,10 @@ export function findProduct(products: Item[], q: string): Item {
 
 function countries(p: Item, roas: RoasPayload | null) {
   const offer = str(p.data.offer);
+  const country = str(p.data.country).toUpperCase();
   if (offer && roas && !roas.error) {
     return roas.rows
-      .filter((r) => r.offer_id === offer)
+      .filter((r) => r.offer_id === offer && (!country || r.country === country))
       .sort((a, b) => b.pauta - a.pauta)
       .map((r) => ({ pais: r.country, roas: r.roas, semaforo: semaforo(r.roas), ventas: r.ventas, neto_cop: r.neto, pauta_cop: r.pauta }));
   }
@@ -192,6 +193,7 @@ function productSummary(p: Item, roas: RoasPayload | null, offers: Map<string, s
     celular: d.phone || null,
     avatar: d.avatar || null,
     oferta_dashboard: d.offer ? offers.get(String(d.offer)) || "conectada" : null,
+    pais: d.country || null,
     roas_3_dias: countries(p, roas),
     etapas_listas: Object.keys(STAGES).filter((k) => stages[k]).map((k) => STAGES[k]),
   };
