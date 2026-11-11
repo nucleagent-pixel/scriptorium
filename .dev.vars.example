@@ -1,0 +1,7 @@
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+# Solo si el Dashboard está en otro proyecto de Supabase:
+DASH_SUPABASE_URL=
+DASH_SUPABASE_KEY=
+ANTHROPIC_API_KEY=
