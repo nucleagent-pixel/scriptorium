@@ -82,6 +82,10 @@ h1{margin-top:6px;font-size:44px;line-height:1.05;letter-spacing:-.02em}
 .prow{display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:16px 18px;background:var(--soft);border-radius:20px;text-decoration:none;color:var(--fg);border:0;text-align:left;width:100%}
 .prow:hover{background:#EEEFE9}
 .prow .nm{font-size:15px;font-weight:600}
+.pmini{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.prow.pm{padding:10px 14px;gap:8px 12px;border-radius:16px;justify-content:space-between}
+.prow.pm .nm{font-size:14px}
+.prow.pm .chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
 .prow .mt{font-size:13px;color:var(--muted);margin-top:3px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .grp{display:flex;flex-direction:column;gap:8px}
@@ -459,12 +463,12 @@ function vInicio(){
     '<a class="btn dark" href="#agentes" style="height:48px">'+ic('spark',18,'style="color:var(--lime)"')+'Agentes</a>');
   h+=banners();
   h+='<div class="row">';
-  // products
-  var ps=activeProducts();
-  h+='<section class="card grow2"><div class="cardhead"><div><h2>Productos activos</h2><p class="sub">ROAS de los últimos 3 días, por país</p></div>'+legend()+'</div><div class="grp" style="gap:10px">';
-  if(!ps.length)h+='<div class="empty">Todavía no hay productos activos.<button class="btn ghost" data-a="newproduct">'+ic('plus',16)+'Nuevo producto</button></div>';
-  ps.forEach(function(p){h+=productRow(p);});
-  h+='</div><a class="link" href="#productos">Ver todos los productos '+ic('arrow',14)+'</a></section>';
+  // notes + meeting + goals
+  var notes=S.notes.filter(function(n){return !me||n.who===me;}).sort(function(a,b){return String(b.createdAt).localeCompare(String(a.createdAt));});
+  h+='<section class="card grow2"><div class="cardhead" style="align-items:center"><h2>'+(me?'Mis post-it':'Post-it')+'</h2><button class="btn ghost" data-a="newnote">'+ic('plus',16)+'Nuevo</button></div>';
+  if(!notes.length)h+='<div class="empty">Sin post-it. Anota aquí lo que no quieres olvidar.</div>';
+  else{h+='<div class="notes">';notes.forEach(function(n){h+='<div class="note"><p>'+esc(n.text)+'</p><button class="link u" data-a="opennote" data-id="'+n.id+'">Ver más</button></div>';});h+='</div>';}
+  h+='</section>';
   // my tasks
   var mt=myTasks().sort(taskSort);
   var cur=mt.filter(function(t){return t.status==='En curso';}),pen=mt.filter(function(t){return t.status==='Pendiente';});
@@ -475,13 +479,16 @@ function vInicio(){
     g[1].slice(0,4).forEach(function(t){h+=taskRow(t);});
     if(g[1].length>4)h+='<a class="link u" href="#tareas">y '+(g[1].length-4)+' más</a>';
     h+='</div>';});
-  h+='<a class="link" href="#tareas" style="margin-top:auto">Ver tablero '+ic('arrow',14)+'</a></section></div>';
-  // notes + meeting + goals
-  var notes=S.notes.filter(function(n){return !me||n.who===me;}).sort(function(a,b){return String(b.createdAt).localeCompare(String(a.createdAt));});
-  h+='<div class="row"><section class="card grow2"><div class="cardhead" style="align-items:center"><h2>'+(me?'Mis post-it':'Post-it')+'</h2><button class="btn ghost" data-a="newnote">'+ic('plus',16)+'Nuevo</button></div>';
-  if(!notes.length)h+='<div class="empty">Sin post-it. Anota aquí lo que no quieres olvidar.</div>';
-  else{h+='<div class="notes">';notes.forEach(function(n){h+='<div class="note"><p>'+esc(n.text)+'</p><button class="link u" data-a="opennote" data-id="'+n.id+'">Ver más</button></div>';});h+='</div>';}
-  h+='</section><div class="grow1" style="display:flex;flex-direction:column;gap:24px;min-width:0">';
+  h+='<a class="link" href="#tareas" style="margin-top:auto">Ver tablero '+ic('arrow',14)+'</a></section>';
+  h+='</div>';
+  h+='<div class="row">';
+  // products
+  var ps=activeProducts();
+  h+='<section class="card grow2"><div class="cardhead"><div><h2>Productos activos</h2><p class="sub">ROAS de los últimos 3 días, por país</p></div>'+legend()+'</div><div class="pmini">';
+  if(!ps.length)h+='<div class="empty">Todavía no hay productos activos.<button class="btn ghost" data-a="newproduct">'+ic('plus',16)+'Nuevo producto</button></div>';
+  ps.forEach(function(p){h+=productMini(p);});
+  h+='</div><a class="link" href="#productos">Ver todos los productos '+ic('arrow',14)+'</a></section>';
+  h+='<div class="grow1" style="display:flex;flex-direction:column;gap:24px;min-width:0">';
   var nm=nextMeeting();
   h+='<section class="meeting"><div class="lbl">Próxima reunión</div>';
   if(nm){h+='<div><div class="ttl">'+esc(nm.ev.title)+'</div><div class="when">'+esc(whenText(nm))+'</div></div><div style="display:flex;gap:8px;flex-wrap:wrap">';
@@ -500,6 +507,10 @@ function vInicio(){
 }
 function roasNote(){if(ROAS.error)return '<span style="color:var(--rfg,#9B2418)">'+esc(ROAS.error)+'</span>';if(!ROAS.loaded)return 'Leyendo ROAS del Dashboard…';var t=new Date(ROAS.updatedAt);return 'ROAS del Dashboard, '+esc(shortDate(ROAS.from).toLowerCase())+' a '+esc(shortDate(ROAS.to).toLowerCase())+' · '+pad(t.getHours())+':'+pad(t.getMinutes());}
 function legend(){return '<div class="legend"><span>'+roasNote()+'</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--g)"></span>1.80 o más</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--a)"></span>1.43 a 1.79</span><span style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:var(--r)"></span>1.42 o menos</span></div>';}
+function productMini(p){
+  var cs=pCountries(p);
+  return '<button class="prow pm" data-a="editproduct" data-id="'+p.id+'"><span class="nm">'+esc(p.name)+'</span><span class="chips">'+(cs.length?cs.map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.offer?'Sin pauta':'Sin países')+'</span>')+'</span></button>';
+}
 function productRow(p){
   var meta=[];if(p.line)meta.push('Línea '+p.line);if(p.phone)meta.push(p.phone);if(p.avatar)meta.push('Avatar: '+p.avatar);
   return '<button class="prow" data-a="editproduct" data-id="'+p.id+'"><div style="flex:1 1 220px;min-width:0"><div class="nm">'+esc(p.name)+'</div><div class="mt">'+esc(meta.join(' · ')||'Sin línea asignada')+'</div></div><div class="chips" style="flex:1 1 260px;justify-content:flex-end">'+(pCountries(p).length?pCountries(p).map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.offer?'Sin pauta en 3 días':'Sin países')+'</span>')+'</div></button>';
