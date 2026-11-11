@@ -111,6 +111,9 @@ h1{margin-top:6px;font-size:44px;line-height:1.05;letter-spacing:-.02em}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
 .pcard{background:var(--card);border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:18px;min-width:0}
 .pcard h2{font-size:20px;line-height:1.2}
+.pcard{gap:14px}
+.pmore{align-self:flex-start;display:inline-flex;align-items:center;gap:4px;background:none;border:0;padding:4px 0;font:inherit;font-size:13px;font-weight:600;color:var(--muted2);cursor:pointer}
+.pmore:hover{color:var(--fg)}
 .facts{margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .facts div{background:var(--soft);border-radius:14px;padding:10px 12px;min-width:0}
 .facts dt{font-size:11px;color:var(--muted)}
@@ -339,7 +342,7 @@ var S={products:[],found:[],lines:[],tasks:[],notes:[],events:[],chats:[],delive
 var sb=null, SESSION=null, ME=null, channel=null, lastLoad=0;
 var ROAS={loaded:false,offers:[],rows:[],from:'',to:'',updatedAt:'',error:''};
 var UI={view:'inicio',ptab:'activos',taskSel:null,taskScope:'mine',prio:'todas',showDone:false,showBlocked:false,
-  calMonth:null,calSel:null,agent:'desarrollador',chatId:null,chatProduct:'',pending:false,draft:'',atts:[],search:'',bell:false,me:''};
+  calMonth:null,calSel:null,agent:'desarrollador',chatId:null,chatProduct:'',pending:false,draft:'',atts:[],search:'',bell:false,me:'',pOpen:{}};
 
 function cfg(){var c=S.config||{};return {members:S.members.filter(function(m){return m.role!=='pendiente';}).map(function(m){return m.name;}),goals:c.goals||[]};}
 
@@ -524,6 +527,9 @@ function productCard(p){
   var st=p.stages||{};var done=STAGES.filter(function(s){return st[s[0]];}).length;
   var h='<article class="pcard"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><h2>'+esc(p.name)+'</h2><button class="iconbtn sm" data-a="editproduct" data-id="'+p.id+'" aria-label="Editar '+esc(p.name)+'">'+ic('edit',16)+'</button></div>';
   h+='<div class="chips">'+(pCountries(p).length?pCountries(p).map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.offer?'Sin pauta en 3 días':'Sin países')+'</span>')+(p.status&&p.status!=='activo'?'<span class="pill">'+esc(cap(p.status))+'</span>':'')+'</div>';
+  var open=!!UI.pOpen[p.id];
+  h+='<button type="button" class="pmore" data-a="pmore" data-id="'+p.id+'" aria-expanded="'+open+'">'+(open?'Ver menos':'Ver más')+ic(open?'up':'down',16)+'</button>';
+  if(!open)return h+'</article>';
   h+='<dl class="facts"><div><dt>Línea</dt><dd>'+esc(p.line||'—')+'</dd></div><div><dt>Celular</dt><dd>'+esc(p.phone||'—')+'</dd></div><div><dt>Avatar</dt><dd>'+esc(p.avatar||'—')+'</dd></div></dl>';
   h+='<div><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px"><span>Etapas</span><span style="color:var(--fg);font-weight:600">'+done+' de 5</span></div><div class="stages">';
   STAGES.forEach(function(s){h+='<button class="stage'+(st[s[0]]?' on':'')+'" data-a="stage" data-id="'+p.id+'" data-s="'+s[0]+'" aria-pressed="'+(!!st[s[0]])+'">'+s[1]+'</button>';});
@@ -893,6 +899,7 @@ document.addEventListener('click',function(ev){
     case 'newproduct':productForm();return;
     case 'editproduct':productForm(byId('products',id));return;
     case 'stage':var p=byId('products',id);if(!p)return;var st=Object.assign({},p.stages||{});st[el.dataset.s]=!st[el.dataset.s];store.update('products',id,{stages:st});return;
+    case 'pmore':UI.pOpen[id]=!UI.pOpen[id];render();return;
     case 'ptab':UI.ptab=el.dataset.t;render();return;
     case 'newfound':foundForm();return;
     case 'editfound':foundForm(byId('found',id));return;
