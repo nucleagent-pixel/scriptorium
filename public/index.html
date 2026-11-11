@@ -329,7 +329,7 @@ function chip(c){
 function parseCountries(s){
   return String(s||'').split(/[,;\n]+/).map(function(x){x=x.trim();if(!x)return null;var m=x.match(/^([A-Za-z]{2,3})\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)?$/);if(!m)return null;return {code:m[1].toUpperCase(),roas:m[2]?parseFloat(m[2].replace(',','.')):null};}).filter(Boolean);
 }
-function pCountries(p){if(!p)return [];if(p.offer&&ROAS.loaded){return ROAS.rows.filter(function(r){return r.offer_id===p.offer;}).sort(function(a,b){return b.pauta-a.pauta;}).map(function(r){return {code:r.country,roas:r.roas};});}return p.countries||[];}
+function pCountries(p){if(!p)return [];if(p.offer&&ROAS.loaded){return ROAS.rows.filter(function(r){return r.offer_id===p.offer&&(!p.country||r.country===p.country);}).sort(function(a,b){return b.pauta-a.pauta;}).map(function(r){return {code:r.country,roas:r.roas};});}return p.countries||[];}
 function offerName(id){var o=ROAS.offers.find(function(x){return x.id===id;});return o?o.name:'';}
 function countriesText(cs){return (cs||[]).map(function(c){return c.code+(c.roas!=null?' '+c.roas:'');}).join(', ');}
 
@@ -752,6 +752,7 @@ function productForm(p){
     {name:'phone',label:'Celular',value:p.phone,placeholder:'Cel. 3'},
     {name:'avatar',label:'Avatar',value:p.avatar,placeholder:'Nombre del avatar'},
     {name:'offer',label:'Oferta en el NUCLEA Dashboard',type:'select',value:p.offer||'',hint:'el ROAS por país se lee solo',options:[['','Sin conectar']].concat(ROAS.offers.filter(function(o){return !o.archived||o.id===p.offer;}).map(function(o){return [o.id,o.name];})).concat(p.offer&&!offerName(p.offer)?[[p.offer,'Oferta no encontrada']]:[])},
+    {name:'country',label:'País de este producto',value:p.country||'',hint:'con oferta conectada: solo se ve el ROAS de este país; vacío = todos',placeholder:'CO'},
     {name:'countries',label:'Países y ROAS a mano',value:countriesText(p.countries),hint:'solo si no está conectado a una oferta',placeholder:'CO 1.55, BO 1.21'},
     {name:'stages',label:'Etapas listas',type:'checks',value:STAGES.filter(function(s){return (p.stages||{})[s[0]];}).map(function(s){return s[0];}),options:STAGES},
     {name:'lg',label:'Enlace a guiones',value:(p.links||{}).guiones,type:'url',placeholder:'https://'},
@@ -760,7 +761,7 @@ function productForm(p){
   ],submit:isNew?'Crear producto':'Guardar',
   onDelete:isNew?null:function(){if(!confirmTwice('delp'+p.id))return false;store.remove('products',p.id);toast('Producto borrado');return true;},deleteLabel:'Borrar producto',
   onSubmit:function(v){if(!v.name)return false;var st={};STAGES.forEach(function(s){st[s[0]]=v.stages.indexOf(s[0])>=0;});
-    var data={name:v.name,status:v.status,line:v.line,phone:v.phone,avatar:v.avatar,offer:v.offer,countries:parseCountries(v.countries),stages:st,links:{guiones:v.lg,videos:v.lv,drive:v.ld}};
+    var data={name:v.name,status:v.status,line:v.line,phone:v.phone,avatar:v.avatar,offer:v.offer,country:String(v.country||'').trim().toUpperCase(),countries:parseCountries(v.countries),stages:st,links:{guiones:v.lg,videos:v.lv,drive:v.ld}};
     if(isNew)store.add('products',data).then(function(){toast('Producto creado');});else store.update('products',p.id,data).then(function(){toast('Guardado');});
     if(v.line){var l=S.lines.find(function(x){return String(x.num)===v.line;});if(l&&isNew===false&&l.product!==p.id&&v.status==='activo')store.update('lines',l.id,{status:'vendiendo',product:p.id});}
     return true;}});
