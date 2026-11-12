@@ -102,17 +102,22 @@ export const TOOLS = [
   },
   {
     name: "registrar_hallazgo",
-    description: "Registra un anunciante modelable encontrado en la biblioteca de anuncios de Meta (aparece en Productos → Encontrados).",
+    description: "Registra un producto encontrado en la biblioteca de anuncios de Meta (aparece en Productos → Encontrados): nombre, calificación, estado, nicho, anuncios, enlaces y notas.",
     inputSchema: {
       type: "object",
       properties: {
-        fan_page: { type: "string" },
-        tema: { type: "string", description: "De qué trata" },
+        nombre: { type: "string", description: "Nombre del producto encontrado" },
+        fan_page: { type: "string", description: "Fan page del anunciante (opcional)" },
+        descripcion: { type: "string", description: "De qué trata, palabras clave, observaciones" },
+        estado: { type: "string", enum: ["nuevo", "analisis", "descartado"], default: "nuevo" },
+        calificacion: { type: "integer", minimum: 0, maximum: 5, description: "Estrellas de 0 a 5" },
+        nicho: { type: "string" },
         anuncios: { type: "integer", description: "Anuncios activos" },
         enlace: { type: "string", description: "Enlace a la biblioteca de anuncios" },
+        pdf: { type: "string", description: "Enlace de Drive al PDF del producto" },
+        notas: { type: "array", items: { type: "string" }, description: "Notas iniciales" },
         origen: { type: "string", description: "Quién lo encontró", default: "Investigador" },
       },
-      required: ["fan_page"],
     },
   },
   {
@@ -326,14 +331,24 @@ export async function callTool(env: Env, name: string, args: Json): Promise<unkn
     }
 
     case "registrar_hallazgo": {
-      const page = str(args.fan_page, 120);
-      if (!page) throw new ToolError("Falta la fan page");
-      const url = str(args.enlace, 500);
+      const nombre = str(args.nombre, 120) || str(args.fan_page, 120);
+      if (!nombre) throw new ToolError("Falta el nombre del producto");
+      const url = str(args.enlace, 1000);
       if (url && !/^https?:\/\//i.test(url)) throw new ToolError("El enlace debe empezar por https://");
+      const pdf = str(args.pdf, 1000);
+      if (pdf && !/^https?:\/\//i.test(pdf)) throw new ToolError("El enlace del PDF debe empezar por https://");
+      const estado = ["nuevo", "analisis", "descartado"].includes(String(args.estado)) ? String(args.estado) : "nuevo";
+      const now = new Date().toISOString();
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
+      const origen = str(args.origen, 60) || "Investigador";
+      const notas = Array.isArray(args.notas)
+        ? (args.notas as unknown[]).map((t) => str(t, 2000)).filter(Boolean).map((t, i) => ({ id: `n${Date.now().toString(36)}${i}`, t, por: origen, en: now }))
+        : [];
       const id = await insert(env, "found", {
-        page, topic: str(args.tema, 200), ads: args.anuncios != null ? String(Number(args.anuncios) || 0) : "", url,
-        date: today, source: str(args.origen, 60) || "Investigador", createdAt: new Date().toISOString(),
+        nombre, page: str(args.fan_page, 120), descripcion: str(args.descripcion, 2000), estado,
+        calificacion: Math.max(0, Math.min(5, Math.round(Number(args.calificacion) || 0))), nicho: str(args.nicho, 60),
+        anuncios: Math.max(0, Math.round(Number(args.anuncios) || 0)), biblioteca: url, pdf, notas,
+        date: today, source: origen, createdAt: now,
       });
       return { ok: true, id };
     }

@@ -85,6 +85,15 @@ describe("conector MCP", () => {
     expect((await call("crear_tarea", { titulo: "x", vence: "mañana" })).body.result.isError).toBe(true);
   });
 
+  it("registra un hallazgo con calificación, estado, enlaces y notas", async () => {
+    const { body } = await call("registrar_hallazgo", { nombre: "Huerto", estado: "analisis", calificacion: 9, anuncios: 33, enlace: "https://www.facebook.com/ads/library/?q=huerto", notas: ["Ver PDF"] });
+    expect(body.result.structuredContent.ok).toBe(true);
+    const r = rows.find((x) => x.col === "found")!;
+    expect(r.data).toMatchObject({ nombre: "Huerto", estado: "analisis", calificacion: 5, anuncios: 33, biblioteca: "https://www.facebook.com/ads/library/?q=huerto" });
+    expect((r.data.notas as { t: string }[])[0].t).toBe("Ver PDF");
+    expect((await call("registrar_hallazgo", { nombre: "x", enlace: "ftp://x" })).body.result.isError).toBe(true);
+  });
+
   it("pide precisar cuando el nombre es ambiguo", () => {
     const ps = [{ id: "1", data: { name: "Reto A" }, created_at: "" }, { id: "2", data: { name: "Reto B" }, created_at: "" }];
     expect(() => findProduct(ps, "reto")).toThrow(/varios/);
