@@ -257,16 +257,21 @@ textarea.acta:focus{border-color:var(--ink)}
 /* chat del equipo */
 .navi{position:relative}
 .navi .nb{position:absolute;top:0;left:50%;margin-left:12px;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:#D23B2A;color:#fff;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1}
-.tchat{display:flex;gap:16px;min-width:0;min-height:calc(100vh - 190px)}
-.chlist{flex:0 0 230px;display:flex;flex-direction:column;gap:4px;overflow:auto}
+.tchat{display:flex;gap:16px;min-width:0;min-height:0;flex:1 1 auto}
+/* Equipo ocupa justo la pantalla: la página no se mueve, solo la lista de canales y los mensajes tienen su propia barra. */
+body.in-equipo main{height:calc(100vh - 64px);height:calc(100dvh - 64px);min-height:420px}
+body.in-equipo .tcard{flex:1 1 auto;min-height:0}
+.chlist{flex:0 0 230px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;min-height:0;overscroll-behavior:contain}
 .chlist h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:14px 10px 4px;font-weight:600}
 .chi{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:9px 12px;border-radius:14px;font:inherit;font-size:14px;color:var(--fg);cursor:pointer}
 .chi:hover{background:var(--soft)}
 .chi[aria-current="true"]{background:var(--lime);font-weight:600}
 .chi .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chi .c{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:#111;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
-.conv{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
-.conv .msgs{max-height:none;flex:1;min-height:300px;height:calc(100vh - 330px)}
+.conv{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:12px}
+.conv .msgs{max-height:none;flex:1 1 0;min-height:160px;height:auto;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#C9CAC2 transparent}
+.conv .msgs::-webkit-scrollbar{width:8px}.conv .msgs::-webkit-scrollbar-thumb{background:#C9CAC2;border-radius:99px}
+.chlist::-webkit-scrollbar{width:6px}.chlist::-webkit-scrollbar-thumb{background:#DADBD4;border-radius:99px}
 .tm{display:flex;flex-direction:column;gap:3px;max-width:78%}
 .tm.mine{align-self:flex-end;align-items:flex-end}
 .tm .tw{font-size:12px;color:var(--muted);padding:0 6px;display:flex;gap:8px;align-items:center}
@@ -280,9 +285,15 @@ textarea.acta:focus{border-color:var(--ink)}
 .chsel{display:none}
 @media (max-width:760px){
   .tchat{flex-direction:column;min-height:0}
+  body.in-equipo main{height:calc(100vh - 136px - env(safe-area-inset-bottom,0px));height:calc(100dvh - 136px - env(safe-area-inset-bottom,0px));min-height:380px;gap:12px}
+  body.in-equipo header.top{gap:10px;padding-top:0}
+  body.in-equipo .eyebrow,body.in-equipo .chead{display:none}
+  body.in-equipo h1{font-size:28px;margin-top:0}
+  body.in-equipo .tcard{padding:14px;border-radius:24px}
+  body.in-equipo .conv{gap:10px}
   .chlist{display:none}
   .chsel{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;padding:10px 14px;border-radius:14px;border:1px solid var(--line,#E4E5DE);font:inherit;background:var(--soft)}
-  .conv .msgs{height:calc(100vh - 500px);min-height:240px}
+  .conv .msgs{min-height:140px}
   .tm{max-width:88%}
   .navi .ic{width:36px;height:36px}
   .navi{font-size:9.5px}
@@ -494,11 +505,11 @@ function vEquipo(){
   if(document.visibilityState==='visible')markRead(ch);
   var rm=readMap();
   var h=top('Habla con el equipo','Equipo','<button class="btn ghost" data-a="notifon">'+ic('bell',16)+(window.Notification&&Notification.permission==='granted'?'Avisos activos':'Activar avisos')+'</button>');
-  h+='<section class="card pad24"><div class="tchat"><nav class="chlist" aria-label="Canales">';
+  h+='<section class="card pad24 tcard"><div class="tchat"><nav class="chlist" aria-label="Canales">';
   chs.forEach(function(c,i){if(i===1)h+='<h3>Productos</h3>';var u=c===ch?0:unreadIn(c,rm);h+='<button class="chi" data-a="chgo" data-ch="'+esc(c)+'" aria-current="'+(c===ch)+'"><span>#</span><span class="n">'+esc(chName(c))+'</span>'+(u?'<span class="c">'+u+'</span>':'')+'</button>';});
   h+='</nav><div class="conv">';
   h+='<select class="chsel" data-c="chsel" aria-label="Canal">'+chs.map(function(c){var u=c===ch?0:unreadIn(c,rm);return '<option value="'+esc(c)+'"'+(c===ch?' selected':'')+'># '+esc(chName(c))+(u?' ('+u+' nuevos)':'')+'</option>';}).join('')+'</select>';
-  h+='<div><h2 style="margin:0"># '+esc(chName(ch))+'</h2><p class="sub" style="margin:2px 0 0">'+(ch==='general'?'Para todo el equipo.':'Todo lo de '+esc(chName(ch))+', en todos los países.')+'</p></div>';
+  h+='<div class="chead"><h2 style="margin:0"># '+esc(chName(ch))+'</h2><p class="sub" style="margin:2px 0 0">'+(ch==='general'?'Para todo el equipo.':'Todo lo de '+esc(chName(ch))+', en todos los países.')+'</p></div>';
   var ms=teamMsgs().filter(function(m){return m.ch===ch;}).sort(function(a,b){return String(a.createdAt).localeCompare(String(b.createdAt));});
   h+='<div class="msgs" id="msgs" aria-live="polite">';
   if(!ms.length)h+='<div class="empty">Todavía no hay mensajes aquí. Escribe el primero.</div>';
@@ -512,7 +523,7 @@ function vEquipo(){
 }
 function linkify(t){return esc(t).replace(/(https?:\/\/[^\s<]+)/g,function(u){return '<a href="'+u+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">'+u+'</a>';});}
 function sendTeam(){var el=document.getElementById('tmsg');if(!el)return;var v=el.value.trim();if(!v)return;el.value='';
-  store.add('chats',{kind:'team',ch:UI.ch||'general',text:v.slice(0,4000),who:UI.me||'Alguien',uid:ME&&ME.user_id||''});markRead(UI.ch||'general');}
+  UI.stick=true;store.add('chats',{kind:'team',ch:UI.ch||'general',text:v.slice(0,4000),who:UI.me||'Alguien',uid:ME&&ME.user_id||''});markRead(UI.ch||'general');}
 function onTeamInsert(doc){
   if(!doc||doc.kind!=='team'||isMine(doc))return;
   var here=UI.view==='equipo'&&(UI.ch||'general')===doc.ch&&document.visibilityState==='visible';
@@ -909,8 +920,9 @@ function render(){
   var main=document.getElementById('main');
   var ae=document.activeElement,keep=null;
   if(ae&&ae.id&&main.contains(ae)&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')){keep={id:ae.id,v:ae.value,s:ae.selectionStart,e:ae.selectionEnd};}
-  var msgs=document.getElementById('msgs');var atBottom=!msgs||(msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<40);
+  var msgs=document.getElementById('msgs');var atBottom=!msgs||UI.stick||(msgs.scrollHeight-msgs.scrollTop-msgs.clientHeight<40);UI.stick=false;
   renderRail();
+  document.body.classList.toggle('in-equipo',UI.view==='equipo');
   main.innerHTML=(R[UI.view]||vInicio)();
   if(keep){var el=document.getElementById(keep.id);if(el){el.value=keep.v;el.focus();try{el.setSelectionRange(keep.s,keep.e);}catch(e){}}}
   var m2=document.getElementById('msgs');if(m2&&atBottom)m2.scrollTop=m2.scrollHeight;
