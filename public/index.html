@@ -670,7 +670,7 @@ function fLib(f){return f.biblioteca||f.url||'';}
 function stars(f){var n=Number(f.calificacion)||0,h='<span class="stars" role="group" aria-label="Calificación: '+n+' de 5">';
   for(var i=1;i<=5;i++)h+='<button type="button" class="'+(i<=n?'on':'')+'" data-a="fstar" data-id="'+f.id+'" data-n="'+i+'" aria-label="'+i+' de 5">★</button>';return h+'</span>';}
 function foundSection(found){
-  var h='<section class="card"><div class="cardhead" style="align-items:flex-end"><div><h2>Productos encontrados</h2><p class="sub">Productos en investigación. Cuando uno empieza a vender, pásalo a Productos y su análisis queda guardado.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap">'+(ME&&ME.role==='admin'?'<button class="btn ghost" data-a="oldimport">Traer del Scriptorium viejo</button>':'')+'<button class="btn ghost" data-a="newfound">'+ic('plus',16)+'Nuevo hallazgo</button></div></div>';
+  var h='<section class="card"><div class="cardhead" style="align-items:flex-end"><div><h2>Productos encontrados</h2><p class="sub">Productos en investigación. Cuando uno empieza a vender, márcalo como Vendiendo y sale de esta lista; la oferta se crea en el Dashboard.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap">'+(ME&&ME.role==='admin'?'<button class="btn ghost" data-a="oldimport">Traer del Scriptorium viejo</button>':'')+'<button class="btn ghost" data-a="newfound">'+ic('plus',16)+'Nuevo hallazgo</button></div></div>';
   if(!found.length)return h+'<div class="empty">No hay productos encontrados.</div></section>';
   h+='<div class="tablewrap"><table class="t found"><thead><tr><th>Producto</th><th>Calificación</th><th>Estado</th><th>Nicho</th><th style="text-align:right">Anuncios</th><th>Links</th><th>Notas</th><th><span class="sr">Acciones</span></th></tr></thead><tbody>';
   found.sort(function(a,b){var da=a.estado==='descartado'?1:0,db=b.estado==='descartado'?1:0;return da-db||(Number(b.calificacion)||0)-(Number(a.calificacion)||0)||fAds(b)-fAds(a);}).forEach(function(f){
@@ -680,7 +680,7 @@ function foundSection(found){
     h+='<td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">'+fAds(f)+'</td>';
     h+='<td style="white-space:nowrap">'+(lib?'<a href="'+esc(safeUrl(lib))+'" target="_blank" rel="noopener">Biblioteca</a>':'')+(f.pdf?' <a href="'+esc(safeUrl(f.pdf))+'" target="_blank" rel="noopener">PDF</a>':'')+(!lib&&!f.pdf?'—':'')+'</td>';
     h+='<td><button class="btn ghost sm" data-a="fnotes" data-id="'+f.id+'">'+nn+' nota'+(nn===1?'':'s')+'</button></td>';
-    h+='<td><div class="facts">'+(f.estado!=='descartado'?'<button class="btn dark sm" data-a="convert" data-id="'+f.id+'">Pasar a Productos</button>':'')+'<button class="iconbtn sm" data-a="editfound" data-id="'+f.id+'" aria-label="Editar">'+ic('edit',14)+'</button><button class="iconbtn sm" data-a="delfound" data-id="'+f.id+'" aria-label="Borrar">'+ic('x',14)+'</button></div></td></tr>';});
+    h+='<td><div class="facts">'+(f.estado!=='descartado'?'<button class="btn dark sm" data-a="fselling" data-id="'+f.id+'" title="Ya se vende: la oferta se crea en el Dashboard">Vendiendo</button>':'')+'<button class="iconbtn sm" data-a="editfound" data-id="'+f.id+'" aria-label="Editar">'+ic('edit',14)+'</button><button class="iconbtn sm" data-a="delfound" data-id="'+f.id+'" aria-label="Borrar">'+ic('x',14)+'</button></div></td></tr>';});
   return h+'</tbody></table></div></section>';
 }
 /* Traer "Productos encontrados" del Scriptorium viejo (Firebase). La clave se usa solo en este navegador. */
@@ -1112,6 +1112,7 @@ document.addEventListener('click',function(ev){
     case 'editfound':foundForm(byId('found',id));return;
     case 'fstar':var fs=byId('found',id);if(!fs)return;var nst=Number(el.dataset.n);store.update('found',id,{calificacion:(Number(fs.calificacion)||0)===nst?nst-1:nst});return;
     case 'fnotes':foundNotes(id);return;
+    case 'fselling':if(!byId('found',id))return;if(!confirmTwice('fsell'+id))return;store.update('found',id,{estado:'vendiendo',converted:true,sellingSince:iso(today())});toast('Marcado como vendiendo. Sale de Encontrados.');return;
     case 'oldimport':oldImportForm(el.dataset.w||'found');return;
     case 'fdelnote':var fn=byId('found',id);if(!fn||!confirmTwice('dfn'+el.dataset.n))return;store.update('found',id,{notas:(fn.notas||[]).filter(function(n){return n.id!==el.dataset.n;})}).then(function(){foundNotes(id);});return;
     case 'delfound':if(!confirmTwice('delf'+id))return;store.remove('found',id);toast('Hallazgo borrado');return;
