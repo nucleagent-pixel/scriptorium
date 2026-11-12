@@ -171,6 +171,8 @@ aside.detail{flex:1 1 340px;min-width:0;background:var(--card);border-radius:28p
 .fgrid label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);background:var(--soft);border-radius:14px;padding:8px 12px}
 .fgrid select,.fgrid input{border:0;background:transparent;font-size:14px;font-weight:600;padding:2px 0;outline:0;color:var(--fg);width:100%}
 .mini{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stars{display:inline-flex;gap:1px;white-space:nowrap}.stars button{border:0;background:none;padding:0 1px;font-size:17px;line-height:1;color:var(--line);cursor:pointer}.stars button.on{color:#E0A100}
+table.found td{vertical-align:middle}.facts{display:flex;gap:6px;align-items:center;justify-content:flex-end;white-space:nowrap}.fdesc{font-size:12px;color:var(--muted);max-width:34ch;margin-top:3px;white-space:pre-wrap}
 .comment{background:var(--soft);border-radius:14px;padding:10px 12px;font-size:13px;white-space:pre-wrap;word-break:break-word}
 .comment b{font-weight:600}
 .comment small{color:var(--muted);font-size:11px;margin-left:6px}
@@ -661,13 +663,64 @@ function productCard(p){
   h+='</div></article>';
   return h;
 }
+var FOUND_ST={nuevo:['Nuevo','n'],analisis:['En análisis','a'],desarrollo:['En desarrollo','a'],testeando:['Testeando','g'],descartado:['Descartado','r']};
+function fName(f){return f.nombre||f.topic||f.page||'Sin nombre';}
+function fAds(f){var n=f.anuncios!=null&&f.anuncios!==''?f.anuncios:f.ads;return n==null||n===''?0:Number(n)||0;}
+function fLib(f){return f.biblioteca||f.url||'';}
+function stars(f){var n=Number(f.calificacion)||0,h='<span class="stars" role="group" aria-label="Calificación: '+n+' de 5">';
+  for(var i=1;i<=5;i++)h+='<button type="button" class="'+(i<=n?'on':'')+'" data-a="fstar" data-id="'+f.id+'" data-n="'+i+'" aria-label="'+i+' de 5">★</button>';return h+'</span>';}
 function foundSection(found){
-  var h='<section class="card"><div class="cardhead" style="align-items:flex-end"><div><h2>Productos encontrados</h2><p class="sub">Hallazgos cargados a mano o por el investigador de anuncios. Un clic los pasa a producto.</p></div><button class="btn ghost" data-a="newfound">'+ic('plus',16)+'Cargar hallazgo</button></div>';
-  if(!found.length)return h+'<div class="empty">No hay hallazgos pendientes.</div></section>';
-  h+='<div class="tablewrap"><table class="t"><thead><tr><th>Fan page</th><th>De qué trata</th><th>Anuncios</th><th>Encontrado</th><th>Origen</th><th><span class="sr">Acción</span></th></tr></thead><tbody>';
-  found.sort(function(a,b){return String(b.date).localeCompare(String(a.date));}).forEach(function(f){
-    h+='<tr><td>'+(f.url?'<a href="'+esc(safeUrl(f.url))+'" target="_blank" rel="noopener">'+esc(f.page)+'</a>':esc(f.page))+'</td><td>'+esc(f.topic)+'</td><td style="font-variant-numeric:tabular-nums">'+esc(f.ads||'—')+'</td><td style="color:var(--muted2)">'+esc(shortDate(f.date))+'</td><td><span class="pill">'+esc(f.source||'—')+'</span></td><td><button class="link" data-a="editfound" data-id="'+f.id+'" style="margin-right:12px">Editar</button><button class="btn dark sm" data-a="convert" data-id="'+f.id+'">Pasar a producto</button></td></tr>';});
+  var h='<section class="card"><div class="cardhead" style="align-items:flex-end"><div><h2>Productos encontrados</h2><p class="sub">Productos en investigación. Cuando uno empieza a vender, pásalo a Productos y su análisis queda guardado.</p></div><div style="display:flex;gap:8px;flex-wrap:wrap">'+(ME&&ME.role==='admin'?'<button class="btn ghost" data-a="oldimport">Traer del Scriptorium viejo</button>':'')+'<button class="btn ghost" data-a="newfound">'+ic('plus',16)+'Nuevo hallazgo</button></div></div>';
+  if(!found.length)return h+'<div class="empty">No hay productos encontrados.</div></section>';
+  h+='<div class="tablewrap"><table class="t found"><thead><tr><th>Producto</th><th>Calificación</th><th>Estado</th><th>Nicho</th><th style="text-align:right">Anuncios</th><th>Links</th><th>Notas</th><th><span class="sr">Acciones</span></th></tr></thead><tbody>';
+  found.sort(function(a,b){var da=a.estado==='descartado'?1:0,db=b.estado==='descartado'?1:0;return da-db||(Number(b.calificacion)||0)-(Number(a.calificacion)||0)||fAds(b)-fAds(a);}).forEach(function(f){
+    var st=FOUND_ST[f.estado]||FOUND_ST.nuevo,nn=(f.notas||[]).length,lib=fLib(f);
+    h+='<tr'+(f.estado==='descartado'?' style="opacity:.55"':'')+'><td><b style="font-weight:600">'+esc(fName(f))+'</b>'+(f.descripcion?'<div class="fdesc">'+esc(f.descripcion)+'</div>':'')+'</td>';
+    h+='<td>'+stars(f)+'</td><td><span class="chip '+st[1]+'" style="height:26px"><span class="dot"></span>'+st[0]+'</span></td><td>'+esc(f.nicho||'—')+'</td>';
+    h+='<td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">'+fAds(f)+'</td>';
+    h+='<td style="white-space:nowrap">'+(lib?'<a href="'+esc(safeUrl(lib))+'" target="_blank" rel="noopener">Biblioteca</a>':'')+(f.pdf?' <a href="'+esc(safeUrl(f.pdf))+'" target="_blank" rel="noopener">PDF</a>':'')+(!lib&&!f.pdf?'—':'')+'</td>';
+    h+='<td><button class="btn ghost sm" data-a="fnotes" data-id="'+f.id+'">'+nn+' nota'+(nn===1?'':'s')+'</button></td>';
+    h+='<td><div class="facts">'+(f.estado!=='descartado'?'<button class="btn dark sm" data-a="convert" data-id="'+f.id+'">Pasar a Productos</button>':'')+'<button class="iconbtn sm" data-a="editfound" data-id="'+f.id+'" aria-label="Editar">'+ic('edit',14)+'</button><button class="iconbtn sm" data-a="delfound" data-id="'+f.id+'" aria-label="Borrar">'+ic('x',14)+'</button></div></td></tr>';});
   return h+'</tbody></table></div></section>';
+}
+/* Traer "Productos encontrados" del Scriptorium viejo (Firebase). La clave se usa solo en este navegador. */
+var OLD_FB={key:'AIzaSyDPfDfO1FbC3Qgsje51uGDJnc7y_RnWN0w',project:'caja-pdfs'};
+function fsVal(v){if(!v)return null;if('stringValue' in v)return v.stringValue;if('integerValue' in v)return Number(v.integerValue);if('doubleValue' in v)return v.doubleValue;if('booleanValue' in v)return v.booleanValue;if('timestampValue' in v)return v.timestampValue;if('nullValue' in v)return null;
+  if('arrayValue' in v)return (v.arrayValue.values||[]).map(fsVal);if('mapValue' in v){var o={},f=v.mapValue.fields||{};Object.keys(f).forEach(function(k){o[k]=fsVal(f[k]);});return o;}return null;}
+function fsList(tok,col){var out=[];function page(pt){return fetch('https://firestore.googleapis.com/v1/projects/'+OLD_FB.project+'/databases/(default)/documents/'+col+'?pageSize=300'+(pt?'&pageToken='+encodeURIComponent(pt):''),{headers:{Authorization:'Bearer '+tok}})
+  .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.error&&j.error.message)||('Error '+r.status));return j;});})
+  .then(function(j){(j.documents||[]).forEach(function(d){var o=fsVal({mapValue:{fields:d.fields||{}}});o.id=d.name.split('/').pop();out.push(o);});return j.nextPageToken?page(j.nextPageToken):out;});}return page('');}
+function oldImportForm(){
+  form({title:'Traer del Scriptorium viejo',intro:'Entra con tu correo y clave del Scriptorium viejo. Se traen todos los productos encontrados con su calificación, estado, nicho, anuncios, enlaces, descripción y notas. Los que ya se trajeron no se duplican. La clave no se guarda.',
+    fields:[{name:'email',label:'Correo',type:'email',required:true},{name:'pass',label:'Clave',type:'password',required:true}],submit:'Traer',
+    onSubmit:function(v){if(!v.email||!v.pass)return false;toast('Trayendo del Scriptorium viejo…');oldImport(v.email,v.pass);return true;}});
+}
+function oldImport(email,pass){
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+OLD_FB.key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass,returnSecureToken:true})})
+  .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(/INVALID|PASSWORD|EMAIL/.test(j.error&&j.error.message||'')?'Correo o clave incorrectos':'No se pudo entrar al Scriptorium viejo');return j.idToken;});})
+  .then(function(tok){return Promise.all([fsList(tok,'sc_encontrados'),fsList(tok,'sc_productos').catch(function(){return [];}),fsList(tok,'sc_usuarios').catch(function(){return [];})]);})
+  .then(function(res){var enc=res[0],prods=res[1],users={};res[2].forEach(function(u){users[u.id]=u.nombre||u.email||'';});
+    var have={};S.found.forEach(function(f){if(f.oldId)have[f.oldId]=1;});
+    var todo=enc.filter(function(e){return !have[e.id];}).map(function(e){
+      var p=prods.find(function(x){return x.origenId===e.id;});var st=e.estado||'nuevo';
+      if(p){var m=p.decision==='descartar'?'descartado':p.decision==='escalar'?'vendiendo':String(p.estadoManual||(p.testeoDesde?'testeo':''));if(/vend/.test(m))st='vendido';else if(/descart/.test(m))st='descartado';else if(/test|decis/.test(m))st='testeando';else st='desarrollo';}
+      return {oldId:e.id,nombre:e.nombre||'Sin nombre',estado:st,calificacion:Number(e.calificacion)||0,nicho:e.nicho||'',anuncios:Number(e.anuncios)||0,biblioteca:e.biblioteca||'',pdf:e.pdf||'',descripcion:e.descripcion||'',
+        notas:(e.notas||[]).map(function(n,i){return {id:n.id||('o'+i),t:n.t||n.texto||'',por:users[n.por]||n.porNombre||'Alguien',en:n.en||''};}).filter(function(n){return n.t;}),
+        source:'Scriptorium viejo',date:String(e.creadoEn||e.creado||'').slice(0,10)||iso(today())};}).filter(function(e){return e.estado!=='vendido';});
+    if(!todo.length){toast(enc.length?'Ya estaba todo traído':'El Scriptorium viejo no tiene productos encontrados');return;}
+    return Promise.all(todo.map(function(d){return store.add('found',d);})).then(function(){toast('Listo: '+todo.length+' producto'+(todo.length===1?'':'s')+' traído'+(todo.length===1?'':'s')+' del Scriptorium viejo');UI.ptab='encontrados';render();});})
+  .catch(function(e){toast(e.message||'No se pudo traer');});
+}
+function foundNotes(id){
+  var f=byId('found',id);if(!f)return;
+  var ns=(f.notas||[]).slice().sort(function(a,b){return String(b.en||'').localeCompare(String(a.en||''));});
+  var h='<h2>Notas: '+esc(fName(f))+'</h2><div style="display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto">';
+  ns.forEach(function(n){h+='<div class="comment"><b>'+esc(n.por||'Alguien')+':</b> '+esc(n.t)+'<small>'+esc(shortDate(String(n.en||'').slice(0,10)))+'</small> <button type="button" class="link" style="font-size:11px" data-a="fdelnote" data-id="'+f.id+'" data-n="'+esc(n.id)+'">Borrar</button></div>';});
+  if(!ns.length)h+='<div class="empty" style="padding:12px">Todavía no hay notas.</div>';
+  h+='</div><label class="field" for="f_nota">Nueva nota<textarea id="f_nota" name="nota" style="min-height:66px"></textarea></label>';
+  h+='<div class="mrow"><span class="spacer"></span><button type="button" class="btn ghost" data-a="mclose">Cerrar</button><button type="submit" class="btn dark">Agregar nota</button></div>';
+  openModal(h,function(v){if(!v.nota)return false;var cur=byId('found',id)||f;
+    store.update('found',id,{notas:(cur.notas||[]).concat([{id:Math.random().toString(36).slice(2,10),t:v.nota,por:UI.me||'Alguien',en:new Date().toISOString()}])}).then(function(){foundNotes(id);});return false;});
 }
 
 function vLineas(){
@@ -871,7 +924,8 @@ function productForm(p){
   p=p||{};var isNew=!p.id;
   var lineOpts=[['','Sin línea']].concat(S.lines.slice().sort(sortNum).map(function(l){return [String(l.num),'Línea '+l.num+(l.phone?' · '+l.phone:'')];}));
   var curLine=isNew?'':pLineNum(p);if(curLine&&!lineOpts.some(function(o){return o[0]===curLine;}))lineOpts.push([curLine,'Línea '+curLine]);
-  form({title:isNew?'Nuevo producto':'Editar producto',fields:[
+  var an=p.analysis;
+  form({title:isNew?'Nuevo producto':'Editar producto',intro:an?'Viene de Encontrados: '+(an.calificacion||0)+' de 5 estrellas, '+(an.anuncios||0)+' anuncios'+(an.nicho?', nicho '+an.nicho:'')+(an.descripcion?'. '+an.descripcion:'')+((an.notas||[]).length?' · '+an.notas.length+' nota'+(an.notas.length===1?'':'s')+' guardadas':''):'',fields:[
     {name:'name',label:'Nombre',value:p.name,required:true},
     {name:'status',label:'Estado',type:'select',value:p.status||'activo',options:[['activo','Activo'],['apagado','Apagado'],['archivado','Archivado']]},
     {name:'line',label:'Línea',type:'select',value:curLine,options:lineOpts,hint:'se conecta sola en Líneas'},
@@ -937,16 +991,20 @@ function lineForm(l,assign){
 }
 function foundForm(f){
   f=f||{};var isNew=!f.id;
-  form({title:isNew?'Cargar hallazgo':'Editar hallazgo',fields:[
-    {name:'page',label:'Fan page',value:f.page,required:true},
-    {name:'topic',label:'De qué trata',value:f.topic},
-    {name:'ads',label:'Anuncios activos',type:'number',value:f.ads},
-    {name:'url',label:'Enlace a la biblioteca de anuncios',type:'url',value:f.url,placeholder:'https://'},
-    {name:'date',label:'Encontrado el',type:'date',value:f.date||iso(today())},
-    {name:'source',label:'Origen',type:'select',value:f.source||UI.me||'',options:cfg().members.concat(['Investigador'])}
-  ],submit:isNew?'Cargar':'Guardar',
+  form({title:isNew?'Nuevo producto encontrado':'Editar hallazgo',fields:[
+    {name:'nombre',label:'Nombre del producto',value:f.id?fName(f):'',required:true},
+    {name:'estado',label:'Estado',type:'select',value:f.estado||'nuevo',options:[['nuevo','Nuevo'],['analisis','En análisis'],['desarrollo','En desarrollo'],['testeando','Testeando'],['descartado','Descartado']]},
+    {name:'nicho',label:'Nicho',value:f.nicho,placeholder:'Educación, Religión, Hogar…'},
+    {name:'calificacion',label:'Calificación (0 a 5)',type:'number',value:f.calificacion||0},
+    {name:'anuncios',label:'Cantidad de anuncios',type:'number',value:f.id?fAds(f):''},
+    {name:'biblioteca',label:'Link de la biblioteca de anuncios',type:'url',value:fLib(f),placeholder:'https://www.facebook.com/ads/library/...'},
+    {name:'pdf',label:'Link de Drive del producto en PDF',type:'url',value:f.pdf,placeholder:'https://drive.google.com/...'},
+    {name:'descripcion',label:'Descripción',type:'textarea',value:f.descripcion||(f.nombre?'':f.topic&&f.page?f.page:''),rows:3}
+  ],submit:isNew?'Guardar hallazgo':'Guardar',
   onDelete:isNew?null:function(){if(!confirmTwice('delf'+f.id))return false;store.remove('found',f.id);return true;},
-  onSubmit:function(v){if(!v.page)return false;if(isNew)store.add('found',v);else store.update('found',f.id,v);return true;}});
+  onSubmit:function(v){if(!v.nombre)return false;
+    v.calificacion=Math.max(0,Math.min(5,parseInt(v.calificacion,10)||0));v.anuncios=Math.max(0,parseInt(v.anuncios,10)||0);
+    if(isNew){v.notas=[];v.date=iso(today());v.source=UI.me||'';store.add('found',v);}else store.update('found',f.id,v);return true;}});
 }
 function eventForm(e,kind){
   e=e||{};var isNew=!e.id;kind=e.kind||kind||'reunion';var m=cfg().members;
@@ -1030,7 +1088,12 @@ document.addEventListener('click',function(ev){
     case 'ptab':UI.ptab=el.dataset.t;render();return;
     case 'newfound':foundForm();return;
     case 'editfound':foundForm(byId('found',id));return;
-    case 'convert':var f=byId('found',id);if(!f)return;store.add('products',{name:f.topic||f.page,status:'activo',countries:[],stages:{},links:{},from:f.page}).then(function(pid){store.update('found',id,{converted:true,product:pid||''});UI.ptab='activos';toast('Pasado a producto. Completa sus datos.');setTimeout(function(){var np=byId('products',pid);if(np)productForm(np);},400);});return;
+    case 'fstar':var fs=byId('found',id);if(!fs)return;var nst=Number(el.dataset.n);store.update('found',id,{calificacion:(Number(fs.calificacion)||0)===nst?nst-1:nst});return;
+    case 'fnotes':foundNotes(id);return;
+    case 'oldimport':oldImportForm();return;
+    case 'fdelnote':var fn=byId('found',id);if(!fn||!confirmTwice('dfn'+el.dataset.n))return;store.update('found',id,{notas:(fn.notas||[]).filter(function(n){return n.id!==el.dataset.n;})}).then(function(){foundNotes(id);});return;
+    case 'delfound':if(!confirmTwice('delf'+id))return;store.remove('found',id);toast('Hallazgo borrado');return;
+    case 'convert':var f=byId('found',id);if(!f)return;store.add('products',{name:fName(f),status:'activo',countries:[],stages:{},links:{},from:fName(f),found:id,analysis:{calificacion:f.calificacion||0,nicho:f.nicho||'',anuncios:fAds(f),biblioteca:fLib(f),pdf:f.pdf||'',descripcion:f.descripcion||'',notas:f.notas||[]}}).then(function(pid){store.update('found',id,{converted:true,product:pid||''});UI.ptab='activos';toast('Pasado a producto. Completa sus datos.');setTimeout(function(){var np=byId('products',pid);if(np)productForm(np);},400);});return;
     case 'chgo':UI.ch=el.dataset.ch;render();var t1=document.getElementById('msgs');if(t1)t1.scrollTop=t1.scrollHeight;var ta=document.getElementById('tmsg');if(ta&&window.innerWidth>760)ta.focus();return;
     case 'delteam':if(!confirmTwice('dt'+id))return;store.remove('chats',id);return;
     case 'notifon':if(!window.Notification){toast('Este navegador no permite avisos.');return;}Notification.requestPermission().then(function(r){toast(r==='granted'?'Listo: te avisaremos de mensajes nuevos aunque estés en otra pestaña.':'No se activaron los avisos. Puedes permitirlos en la configuración del navegador.');render();});return;
