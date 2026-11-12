@@ -690,25 +690,47 @@ function fsVal(v){if(!v)return null;if('stringValue' in v)return v.stringValue;i
 function fsList(tok,col){var out=[];function page(pt){return fetch('https://firestore.googleapis.com/v1/projects/'+OLD_FB.project+'/databases/(default)/documents/'+col+'?pageSize=300'+(pt?'&pageToken='+encodeURIComponent(pt):''),{headers:{Authorization:'Bearer '+tok}})
   .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.error&&j.error.message)||('Error '+r.status));return j;});})
   .then(function(j){(j.documents||[]).forEach(function(d){var o=fsVal({mapValue:{fields:d.fields||{}}});o.id=d.name.split('/').pop();out.push(o);});return j.nextPageToken?page(j.nextPageToken):out;});}return page('');}
-function oldImportForm(){
-  form({title:'Traer del Scriptorium viejo',intro:'Entra con tu correo y clave del Scriptorium viejo. Se traen todos los productos encontrados con su calificación, estado, nicho, anuncios, enlaces, descripción y notas. Los que ya se trajeron no se duplican. La clave no se guarda.',
+var OLD_WHAT={found:{title:'productos encontrados',intro:'Se traen todos los productos encontrados con su calificación, estado, nicho, anuncios, enlaces, descripción y notas.'},
+  lines:{title:'líneas',intro:'Se traen todas las líneas en cualquier estado menos Vendiendo, con su número, celular, operador, quién la maneja, días de calentamiento y notas.'}};
+function oldImportForm(what){what=what||'found';
+  form({title:'Traer '+OLD_WHAT[what].title+' del Scriptorium viejo',intro:'Entra con tu correo y clave del Scriptorium viejo. '+OLD_WHAT[what].intro+' Lo que ya se trajo no se duplica. La clave no se guarda.',
     fields:[{name:'email',label:'Correo',type:'email',required:true},{name:'pass',label:'Clave',type:'password',required:true}],submit:'Traer',
-    onSubmit:function(v){if(!v.email||!v.pass)return false;toast('Trayendo del Scriptorium viejo…');oldImport(v.email,v.pass);return true;}});
+    onSubmit:function(v){if(!v.email||!v.pass)return false;toast('Trayendo del Scriptorium viejo…');oldImport(v.email,v.pass,what);return true;}});
 }
-function oldImport(email,pass){
+// Estado de un producto del viejo, igual que estadoProducto() de allá.
+function oldProdState(p,tasks){
+  if(!p)return '';if(p.decision==='descartar')return 'descartado';if(p.decision==='escalar')return 'vendiendo';if(p.estadoManual)return p.estadoManual;
+  var camp=tasks.filter(function(t){return t.productoId===p.id&&t.etapa==='campanas';});
+  if(p.testeoDesde||(camp.length&&camp.every(function(t){return t.estado==='completada';})))return 'testeo';return 'desarrollo';
+}
+function oldNotes(arr,users){return (arr||[]).map(function(n,i){return {id:n.id||('o'+i),t:n.t||n.texto||'',por:users[n.por]||n.porNombre||'Alguien',en:n.en||''};}).filter(function(n){return n.t;});}
+function oldImport(email,pass,what){
   fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+OLD_FB.key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass,returnSecureToken:true})})
   .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(/INVALID|PASSWORD|EMAIL/.test(j.error&&j.error.message||'')?'Correo o clave incorrectos':'No se pudo entrar al Scriptorium viejo');return j.idToken;});})
-  .then(function(tok){return Promise.all([fsList(tok,'sc_encontrados'),fsList(tok,'sc_productos').catch(function(){return [];}),fsList(tok,'sc_usuarios').catch(function(){return [];})]);})
-  .then(function(res){var enc=res[0],prods=res[1],users={};res[2].forEach(function(u){users[u.id]=u.nombre||u.email||'';});
-    var have={};S.found.forEach(function(f){if(f.oldId)have[f.oldId]=1;});
-    var todo=enc.filter(function(e){return !have[e.id];}).map(function(e){
-      var p=prods.find(function(x){return x.origenId===e.id;});var st=e.estado||'nuevo';
-      if(p){var m=p.decision==='descartar'?'descartado':p.decision==='escalar'?'vendiendo':String(p.estadoManual||(p.testeoDesde?'testeo':''));if(/vend/.test(m))st='vendido';else if(/descart/.test(m))st='descartado';else if(/test|decis/.test(m))st='testeando';else st='desarrollo';}
+  .then(function(tok){var soft=function(c){return fsList(tok,c).catch(function(){return [];});};
+    return Promise.all([what==='lines'?fsList(tok,'sc_lineas'):fsList(tok,'sc_encontrados'),soft('sc_productos'),soft('sc_usuarios'),what==='lines'?soft('sc_tareas'):Promise.resolve([])]);})
+  .then(function(res){var src=res[0],prods=res[1],users={},tasks=res[3];res[2].forEach(function(u){users[u.id]=u.nombre||u.email||'';});
+    var col=what==='lines'?'lines':'found',have={};S[col].forEach(function(x){if(x.oldId)have[x.oldId]=1;});
+    var todo=src.filter(function(e){return !have[e.id];}).map(what==='lines'?function(l){
+      var p=l.productoId&&prods.find(function(x){return x.id===l.productoId;}),ps=oldProdState(p,tasks);
+      var man=l.estadoManual||'nueva',st;
+      if(man==='bloqueada'||man==='baja')st=man;else if(p&&/testeo|decision|vendiendo/.test(ps))st='vendiendo';else if(man==='completo')st='disponible';else st='calentando';
+      var warm=man==='calentando'||man==='completo'?(l.calentandoDesde||''):'';
+      if(man==='completo'&&!warm){var d=today();d.setDate(d.getDate()-WARM_DAYS);warm=iso(d);}
+      var num=String(l.nombre||l.numero||'Sin número').trim().replace(/^l[ií]nea\s+/i,''),extra=[];
+      if(l.nombre&&l.numero)extra.push('Número '+l.numero);if(l.operador)extra.push('Operador: '+l.operador);if(l.maneja)extra.push('La maneja: '+(users[l.maneja]||l.maneja));
+      if(man==='nueva')extra.push('Nueva en el viejo, aún sin empezar a calentar');if(p)extra.push('Producto en el viejo: '+(p.nombre||''));
+      oldNotes(l.notas,users).forEach(function(n){extra.push(n.por+': '+n.t);});
+      return {oldId:l.id,num:num,phone:[l.nombre?l.numero:'',l.dispositivo].filter(Boolean).join(' · '),status:st,warmStart:warm,product:'',note:extra.join(' · '),notas:oldNotes(l.notas,users),operator:l.operador||'',manager:users[l.maneja]||'',oldNumber:l.numero||'',source:'Scriptorium viejo'};
+    }:function(e){
+      var p=prods.find(function(x){return x.origenId===e.id;}),st=e.estado||'nuevo';
+      if(p){var m=oldProdState(p,[]);if(/vend/.test(m))st='vendido';else if(/descart/.test(m))st='descartado';else if(/test|decis/.test(m))st='testeando';else st='desarrollo';}
       return {oldId:e.id,nombre:e.nombre||'Sin nombre',estado:st,calificacion:Number(e.calificacion)||0,nicho:e.nicho||'',anuncios:Number(e.anuncios)||0,biblioteca:e.biblioteca||'',pdf:e.pdf||'',descripcion:e.descripcion||'',
-        notas:(e.notas||[]).map(function(n,i){return {id:n.id||('o'+i),t:n.t||n.texto||'',por:users[n.por]||n.porNombre||'Alguien',en:n.en||''};}).filter(function(n){return n.t;}),
-        source:'Scriptorium viejo',date:String(e.creadoEn||e.creado||'').slice(0,10)||iso(today())};}).filter(function(e){return e.estado!=='vendido';});
-    if(!todo.length){toast(enc.length?'Ya estaba todo traído':'El Scriptorium viejo no tiene productos encontrados');return;}
-    return Promise.all(todo.map(function(d){return store.add('found',d);})).then(function(){toast('Listo: '+todo.length+' producto'+(todo.length===1?'':'s')+' traído'+(todo.length===1?'':'s')+' del Scriptorium viejo');UI.ptab='encontrados';render();});})
+        notas:oldNotes(e.notas,users),source:'Scriptorium viejo',date:String(e.creadoEn||e.creado||'').slice(0,10)||iso(today())};
+    }).filter(function(x){return what==='lines'?x.status!=='vendiendo':x.estado!=='vendido';});
+    var label=what==='lines'?['línea','líneas']:['producto','productos'];
+    if(!todo.length){toast(src.length?'No había nada nuevo para traer':'El Scriptorium viejo no tiene '+label[1]);return;}
+    return Promise.all(todo.map(function(d){return store.add(col,d);})).then(function(){toast('Listo: '+todo.length+' '+label[todo.length===1?0:1]+' del Scriptorium viejo');if(what==='found')UI.ptab='encontrados';render();});})
   .catch(function(e){toast(e.message||'No se pudo traer');});
 }
 function foundNotes(id){
@@ -727,7 +749,7 @@ function vLineas(){
   var free=[],warm=[],sell=[],hidden=[];
   S.lines.slice().sort(sortNum).forEach(function(l){var s=lineState(l);var o={l:l,s:s};
     if(s.status==='disponible')free.push(o);else if(s.status==='calentando')warm.push(o);else if(s.status==='vendiendo')sell.push(o);else hidden.push(o);});
-  var h=top('Ordenadas por estado · el calentamiento dura '+WARM_DAYS+' días','Líneas','<button class="btn" data-a="newline">'+ic('plus',18)+'Nueva línea</button>');
+  var h=top('Ordenadas por estado · el calentamiento dura '+WARM_DAYS+' días','Líneas',(ME&&ME.role==='admin'?'<button class="btn ghost" style="height:48px" data-a="oldimport" data-w="lines">Traer del Scriptorium viejo</button>':'')+'<button class="btn" data-a="newline">'+ic('plus',18)+'Nueva línea</button>');
   h+=banners();
   h+='<div class="cols">';
   h+='<section class="col"><div class="colhead"><h2>Disponibles</h2><span class="count">'+free.length+'</span></div><p class="sub" style="margin:0 0 4px">Libres y ya calientes, listas para un producto.</p>';
@@ -1090,7 +1112,7 @@ document.addEventListener('click',function(ev){
     case 'editfound':foundForm(byId('found',id));return;
     case 'fstar':var fs=byId('found',id);if(!fs)return;var nst=Number(el.dataset.n);store.update('found',id,{calificacion:(Number(fs.calificacion)||0)===nst?nst-1:nst});return;
     case 'fnotes':foundNotes(id);return;
-    case 'oldimport':oldImportForm();return;
+    case 'oldimport':oldImportForm(el.dataset.w||'found');return;
     case 'fdelnote':var fn=byId('found',id);if(!fn||!confirmTwice('dfn'+el.dataset.n))return;store.update('found',id,{notas:(fn.notas||[]).filter(function(n){return n.id!==el.dataset.n;})}).then(function(){foundNotes(id);});return;
     case 'delfound':if(!confirmTwice('delf'+id))return;store.remove('found',id);toast('Hallazgo borrado');return;
     case 'convert':var f=byId('found',id);if(!f)return;store.add('products',{name:fName(f),status:'activo',countries:[],stages:{},links:{},from:fName(f),found:id,analysis:{calificacion:f.calificacion||0,nicho:f.nicho||'',anuncios:fAds(f),biblioteca:fLib(f),pdf:f.pdf||'',descripcion:f.descripcion||'',notas:f.notas||[]}}).then(function(pid){store.update('found',id,{converted:true,product:pid||''});UI.ptab='activos';toast('Pasado a producto. Completa sus datos.');setTimeout(function(){var np=byId('products',pid);if(np)productForm(np);},400);});return;
