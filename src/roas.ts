@@ -90,3 +90,43 @@ export async function cachedRoas(env: Env, ctx: ExecutionContext): Promise<RoasP
   }
   return data;
 }
+
+/** Ventas y facturación neta de todo el equipo entre dos fechas (para las metas). */
+export interface TotalsPayload { from: string; to: string; ventas: number; neto: number; updatedAt: string; error?: string }
+
+/** Suma todas las filas de rendimiento(): todas las ofertas y países, incluidas las archivadas. */
+export function sumTotals(rows: RendimientoRow[]): { ventas: number; neto: number } {
+  let ventas = 0;
+  let neto = 0;
+  for (const r of rows) {
+    ventas += Number(r.ventas) || 0;
+    neto += Number(r.neto_cop) || 0;
+  }
+  return { ventas, neto: Math.round(neto) };
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+export const validRange = (from: string | null, to: string | null): boolean =>
+  !!from && !!to && DAY.test(from) && DAY.test(to) && from <= to;
+
+export async function loadTotals(env: Env, from: string, to: string, now = new Date()): Promise<TotalsPayload> {
+  const perf = await db<RendimientoRow[]>(env, "rpc/rendimiento", { method: "POST", body: JSON.stringify({ p_from: from, p_to: to }) }, dashTarget(env));
+  const out: TotalsPayload = { from, to, updatedAt: now.toISOString(), ...sumTotals(perf.data ?? []) };
+  if (!perf.ok) out.error = "No se pudo leer el NUCLEA Dashboard.";
+  return out;
+}
+
+/** Igual que loadTotals pero guardado 10 minutos en la caché del Worker. */
+export async function cachedTotals(env: Env, ctx: ExecutionContext, from: string, to: string): Promise<TotalsPayload> {
+  const cache = (caches as unknown as { default: Cache }).default;
+  const key = new Request(`https://scriptorium.cache/totales/${from}/${to}`);
+  const hit = await cache.match(key);
+  if (hit) return (await hit.json()) as TotalsPayload;
+  const data = await loadTotals(env, from, to);
+  if (!data.error) {
+    ctx.waitUntil(cache.put(key, new Response(JSON.stringify(data), {
+      headers: { "Content-Type": "application/json", "Cache-Control": "max-age=600" },
+    })));
+  }
+  return data;
+}

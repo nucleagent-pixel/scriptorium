@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bogotaDate, roasWindow, toRoasRows } from "../src/roas";
+import { bogotaDate, roasWindow, sumTotals, toRoasRows, validRange } from "../src/roas";
 
 describe("ROAS", () => {
   it("calcula neto ÷ pauta por oferta y país", () => {
@@ -26,5 +26,20 @@ describe("ROAS", () => {
     expect(roasWindow(at("2026-11-12"), "2026-11-11")).toEqual({ from: "2026-11-11", to: "2026-11-12" });
     expect(roasWindow(at("2026-11-20"), "2026-11-11")).toEqual({ from: "2026-11-18", to: "2026-11-20" });
     expect(roasWindow(at("2026-11-20"))).toEqual({ from: "2026-11-18", to: "2026-11-20" });
+  });
+
+  it("suma ventas y facturación neta de todas las ofertas para las metas", () => {
+    expect(sumTotals([
+      { offer_id: "a", producto: "Reto", archivado: false, country: "CO", ventas: 10, neto_cop: "360000.4", pauta_cop: "1" },
+      { offer_id: null, producto: null, archivado: true, country: null, ventas: 2, neto_cop: 40000, pauta_cop: 0 },
+    ])).toEqual({ ventas: 12, neto: 400000 });
+    expect(sumTotals([])).toEqual({ ventas: 0, neto: 0 });
+  });
+
+  it("valida el rango de fechas", () => {
+    expect(validRange("2026-11-01", "2026-11-30")).toBe(true);
+    expect(validRange("2026-11-30", "2026-11-01")).toBe(false);
+    expect(validRange("2026-11-01", null)).toBe(false);
+    expect(validRange("1/11/2026", "2026-11-30")).toBe(false);
   });
 });

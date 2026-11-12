@@ -112,6 +112,31 @@ h1{margin-top:6px;font-size:44px;line-height:1.05;letter-spacing:-.02em}
 .bar{height:10px;border-radius:99px;background:var(--bg);overflow:hidden}
 .bar>div{height:100%;background:var(--ink);border-radius:99px}
 .foot{margin:0;font-size:12px;color:var(--muted);padding:0 4px}
+[hidden]{display:none!important}
+/* metas */
+.gfil{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.gfil select{height:48px;appearance:auto}
+.gfil .gr{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.gfil .gr input{height:40px;border:1px solid var(--line);border-radius:999px;padding:0 12px;background:var(--card);font-size:13px}
+.gsec{display:flex;flex-direction:column;gap:12px}
+.gsec h2{font-size:22px;padding:0 4px;display:flex;align-items:center;gap:8px}
+.ggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:16px}
+.goal{padding:22px 24px;gap:12px}
+.goal.ok{box-shadow:inset 0 0 0 2px var(--gbg)}
+.ghead{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.ghead h3{font-size:17px;line-height:1.25;font-weight:600;overflow-wrap:anywhere;text-wrap:pretty;flex:1;min-width:0}
+.gact{display:flex;gap:4px;flex:0 0 auto}
+.gact .iconbtn.sm{width:36px;height:36px}
+.gchips{display:flex;flex-wrap:wrap;gap:6px}
+.gchips .chip{height:28px;font-size:12px}
+.gval{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted2)}
+.gval b{color:var(--fg);font-variant-numeric:tabular-nums}
+.gdesc{margin:0;font-size:13px;color:var(--muted)}
+.bar.ok>div{background:var(--g)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field.chk{flex-direction:row;align-items:center;gap:8px;font-weight:500;color:var(--fg);font-size:13px}
+.field.chk input{width:auto}
+@media (max-width:480px){.frow{grid-template-columns:1fr}}
 .empty{padding:18px;border-radius:18px;background:var(--soft);color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:10px;align-items:flex-start}
 .tabs{display:flex;gap:4px;padding:4px;background:var(--card);border-radius:999px;flex-wrap:wrap}
 .tabs button{height:40px;padding:0 18px;border:0;border-radius:999px;background:transparent;font-size:14px;font-weight:500}
@@ -285,7 +310,7 @@ textarea.acta:focus{border-color:var(--ink)}
   .conv .msgs{height:calc(100vh - 500px);min-height:240px}
   .tm{max-width:88%}
   .navi .ic{width:36px;height:36px}
-  .navi{font-size:9.5px}
+  .navi{font-size:9.5px;min-width:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
@@ -334,6 +359,8 @@ var I = {
   right:'<path d="m9 6 6 6-6 6"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>',
   tick:'<path d="m5 12.5 4.5 4.5L19 7"/>',
+  undo:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+  target:'<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".8"/>',
   clip:'<path d="m20 11.5-8.5 8.5a5 5 0 0 1-7-7L13 4.5a3.3 3.3 0 0 1 4.7 4.7L9.3 17.6a1.7 1.7 0 0 1-2.4-2.4L15 7"/>',
   img:'<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5-5 4 4 3-3 4 4"/>',
   doc:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
@@ -382,21 +409,25 @@ function countriesText(cs){return (cs||[]).map(function(c){return c.code+(c.roas
 
 /* ---------- data layer ---------- */
 var COLS=['products','found','lines','tasks','notes','events','chats','deliverables'];
-var S={products:[],found:[],lines:[],tasks:[],notes:[],events:[],chats:[],deliverables:[],members:[],config:null,loaded:{},live:true};
+// Las metas viven en la colección notes con kind:'goal' (así no hay que cambiar la base de datos) y en la app se ven como S.goals.
+var VCOLS=COLS.concat(['goals']);
+function colOf(r){return r&&r.col==='notes'&&r.data&&r.data.kind==='goal'?'goals':r&&r.col;}
+var S={products:[],found:[],lines:[],tasks:[],notes:[],events:[],chats:[],deliverables:[],goals:[],members:[],config:null,loaded:{},live:true};
 var sb=null, SESSION=null, ME=null, channel=null, lastLoad=0;
 var ROAS={loaded:false,offers:[],rows:[],from:'',to:'',updatedAt:'',error:''};
 var UI={view:'inicio',ptab:'activos',taskSel:null,taskScope:'mine',prio:'todas',showDone:false,showBlocked:false,
-  calMonth:null,calSel:null,agent:'desarrollador',chatId:null,chatProduct:'',pending:false,draft:'',atts:[],search:'',bell:false,me:'',pOpen:{}};
+  calMonth:null,calSel:null,agent:'desarrollador',chatId:null,chatProduct:'',pending:false,draft:'',atts:[],search:'',bell:false,me:'',pOpen:{},gf:{modo:'mes',mes:'',ini:'',fin:''}};
 
 function cfg(){var c=S.config||{};return {members:S.members.filter(function(m){return m.role!=='pendiente';}).map(function(m){return m.name;}),goals:c.goals||[]};}
 
 function rowToDoc(r){var d=r.data||{};return Object.assign({},d,{id:r.id,createdAt:d.createdAt||r.created_at});}
-function upsertLocal(r){if(!r||COLS.indexOf(r.col)<0)return;var doc=rowToDoc(r);var arr=S[r.col];var i=arr.findIndex(function(x){return x.id===doc.id;});if(i>=0)arr[i]=doc;else arr.push(doc);}
-function dropLocal(id){COLS.forEach(function(c){S[c]=S[c].filter(function(x){return x.id!==id;});});}
+function upsertLocal(r){var col=colOf(r);if(!r||VCOLS.indexOf(col)<0)return;var doc=rowToDoc(r);var arr=S[col];var i=arr.findIndex(function(x){return x.id===doc.id;});if(i>=0)arr[i]=doc;else arr.push(doc);}
+function dropLocal(id){VCOLS.forEach(function(c){S[c]=S[c].filter(function(x){return x.id!==id;});});}
 function chk(r){if(r&&r.error)throw r.error;return r;}
 var store={
   add:function(col,data){data.createdAt=data.createdAt||new Date().toISOString();
-    return sb.from('sc_items').insert({col:col,data:data}).select('id,col,data,created_at').single().then(chk).then(function(r){upsertLocal(r.data);scheduleRender();return r.data.id;}).catch(fail);},
+    var real=col;if(col==='goals'){real='notes';data.kind='goal';}
+    return sb.from('sc_items').insert({col:real,data:data}).select('id,col,data,created_at').single().then(chk).then(function(r){upsertLocal(r.data);scheduleRender();return r.data.id;}).catch(fail);},
   update:function(col,id,data){
     var it=byId(col,id);if(it)Object.assign(it,data);scheduleRender();
     return sb.rpc('sc_patch',{p_id:id,p_patch:data}).then(chk).catch(fail);},
@@ -525,7 +556,7 @@ function onTeamInsert(doc){
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){document.title=document.title.replace(/^\(\d+\) /,'');if(UI.view==='equipo')scheduleRender();}});
 
 /* ---------- nav & header ---------- */
-var VIEWS=[['inicio','Inicio','home'],['productos','Productos','box'],['lineas','Líneas','phone'],['tareas','Tareas','check'],['calendario','Calendario','cal'],['equipo','Equipo','chat'],['agentes','Agentes','spark']];
+var VIEWS=[['inicio','Inicio','home'],['metas','Metas','target'],['productos','Productos','box'],['lineas','Líneas','phone'],['tareas','Tareas','check'],['calendario','Calendario','cal'],['equipo','Equipo','chat'],['agentes','Agentes','spark']];
 function renderRail(){
   var h='<div class="logo" aria-hidden="true">S</div>';
   var unr=v0Unread();VIEWS.forEach(function(v){var b=v[0]==='equipo'&&unr?'<span class="nb" aria-label="'+unr+' sin leer">'+(unr>99?'99+':unr)+'</span>':'';h+='<a class="navi" href="#'+v[0]+'"'+(UI.view===v[0]?' aria-current="page"':'')+'><span class="ic">'+ic(v[2],22)+'</span>'+v[1]+b+'</a>';});
@@ -552,6 +583,7 @@ function searchResults(){
   S.products.forEach(function(p){if(pLabel(p).toLowerCase().indexOf(q)>=0)r.push({h:'#productos',id:p.id,k:'product',t:pLabel(p),s:'Producto · '+(p.status||'activo')});});
   S.lines.forEach(function(l){if(('línea '+l.num+' linea '+l.num+' '+(l.phone||'')).toLowerCase().indexOf(q)>=0)r.push({h:'#lineas',id:l.id,k:'line',t:'Línea '+l.num,s:lineState(l).status});});
   S.tasks.forEach(function(t){if(String(t.title).toLowerCase().indexOf(q)>=0)r.push({h:'#tareas',id:t.id,k:'task',t:t.title,s:'Tarea · '+t.status});});
+  S.goals.forEach(function(g){if(String(g.titulo).toLowerCase().indexOf(q)>=0)r.push({h:'#metas',id:g.id,k:'goal',t:g.titulo,s:'Meta · '+goalProgress(g).txt});});
   var h='<div class="results" role="listbox">';
   if(!r.length)h+='<div class="sub" style="padding:10px 12px">Sin resultados para “'+esc(UI.search)+'”.</div>';
   r.slice(0,12).forEach(function(x){h+='<a href="'+x.h+'" data-a="searchgo" data-k="'+x.k+'" data-id="'+x.id+'">'+esc(x.t)+'<small>'+esc(x.s)+'</small></a>';});
@@ -606,11 +638,12 @@ function vInicio(){
     h+='<a class="btn ghost" style="height:44px;background:transparent;color:var(--inkfg);border-color:#444" href="#calendario" data-a="calsel" data-ev="'+nm.ev.id+'" data-date="'+nm.date+'">Agenda y acta</a></div>';}
   else h+='<div class="when">No hay reuniones agendadas.</div><a class="btn" href="#calendario">Agendar reunión</a>';
   h+='</section>';
-  var goals=cfg().goals;
-  h+='<section class="card" style="flex:1;padding:24px 28px;gap:16px"><div class="cardhead" style="align-items:center"><h2>Metas del mes</h2><button class="iconbtn sm" data-a="editgoals" aria-label="Editar metas">'+ic('edit',16)+'</button></div>';
-  if(!goals.length)h+='<div class="empty">Sin metas para este mes.</div>';
-  goals.forEach(function(g){var pct=g.total?Math.min(100,Math.round(g.done/g.total*100)):0;
-    h+='<div class="grp"><div style="display:flex;justify-content:space-between;font-size:14px;gap:8px"><span>'+esc(g.label)+'</span><span style="font-weight:600;white-space:nowrap">'+(g.done||0)+' de '+(g.total||0)+'</span></div><div class="bar"><div style="width:'+pct+'%"></div></div></div>';});
+  var mg=goalsIn(monthRange()).map(function(g){return {g:g,ok:goalDone(g)};}).sort(function(a,b){return a.ok===b.ok?0:a.ok?1:-1;});
+  h+='<section class="card" style="flex:1;padding:24px 28px;gap:16px"><div class="cardhead" style="align-items:center"><h2>Metas del mes</h2><a class="iconbtn sm" href="#metas" aria-label="Ver todas las metas">'+ic('arrow',16)+'</a></div>';
+  if(!mg.length)h+='<div class="empty">Sin metas para este mes.<button class="btn ghost" data-a="newgoal">'+ic('plus',16)+'Nueva meta</button></div>';
+  mg.slice(0,4).forEach(function(o){var g=o.g,pr=goalProgress(g),pct=Math.round(Math.min(1,pr.pct)*100);
+    h+='<div class="grp"><div style="display:flex;justify-content:space-between;font-size:14px;gap:8px"><span>'+esc(g.titulo)+'</span><span style="font-weight:600;white-space:nowrap">'+(o.ok?'Cumplida':pct+'%')+'</span></div><div class="bar'+(o.ok?' ok':'')+'"><div style="width:'+pct+'%"></div></div><div class="sub" style="margin:0;font-size:12px">'+esc(pr.txt)+'</div></div>';});
+  if(mg.length>4)h+='<a class="link u" href="#metas">y '+(mg.length-4)+' más</a>';
   h+='</section></div></div>';
   h+='<p class="foot">Lo apagado, bloqueado y terminado no aparece aquí.</p>';
   return h;
@@ -629,6 +662,115 @@ function productRow(p){
 function taskRow(t){
   var done=t.status==='Hecha';
   return '<div class="task"><button class="check'+(done?' on':'')+'" data-a="toggletask" data-id="'+t.id+'" aria-label="'+(done?'Reabrir':'Marcar como hecha')+': '+esc(t.title)+'">'+(done?ic('tick',14):'')+'</button><div style="min-width:0"><button class="tt" data-a="opentask" data-id="'+t.id+'">'+esc(t.title)+'</button><div class="tm'+(isOverdue(t)?' overdue':'')+'">'+esc(taskMeta(t))+'</div></div></div>';
+}
+
+/* ---------- metas (como "Objetivos y metas" del Scriptorium viejo) ---------- */
+// Campos: titulo, periodo, inicio, fin, tipo, objetivo, logrado (solo a mano), diaria, responsables, descripcion, completada, oldId.
+var GOAL_TYPES=[['tareas','Por tareas conectadas'],['facturacion','Por facturación neta (Dashboard)'],['ventas','Por número de ventas (Dashboard)'],['productos','Por productos vendiendo'],['manual','A mano (escribo lo logrado)']];
+var PERIODS=[['semanal','Semanal'],['quincenal','Quincenal'],['mensual','Mensual']];
+var SALES={};
+function salesFor(from,to){var k=from+'|'+to,s=SALES[k];if(s)return s;s=SALES[k]={loading:true};
+  api('/api/ventas?from='+from+'&to='+to).then(function(r){s.loading=false;s.ventas=Number(r.ventas)||0;s.neto=Number(r.neto)||0;s.error=r.error||'';scheduleRender();})
+  .catch(function(){s.loading=false;s.error='No se pudo leer el Dashboard';scheduleRender();});return s;}
+function cop(n){n=Math.round(Number(n)||0);if(Math.abs(n)>=1e6)return '$'+(n/1e6).toLocaleString('es-CO',{maximumFractionDigits:1})+' M';return '$'+n.toLocaleString('es-CO');}
+function parseNum(v){return Number(String(v||'').replace(/[^\d]/g,''))||0;}
+function goalProgress(g){
+  var obj=Number(g.objetivo)||0;
+  if(g.tipo==='facturacion'||g.tipo==='ventas'){
+    var t=iso(today()),from=g.inicio||g.fin||t,to=g.fin||g.inicio||t,act=0;
+    if(g.tipo==='ventas'&&g.diaria){from=t;to=t;}
+    if(to>t)to=t;
+    if(from<=to){var s=salesFor(from,to);if(s.loading)return {pct:0,txt:'Leyendo el Dashboard…'};if(s.error)return {pct:0,txt:s.error};act=g.tipo==='facturacion'?s.neto:s.ventas;}
+    return {pct:obj>0?act/obj:0,txt:g.tipo==='facturacion'?cop(act)+' de '+cop(obj):act+' de '+obj+' ventas'+(g.diaria?' hoy':'')};
+  }
+  if(g.tipo==='productos'){var names={};activeProducts().forEach(function(p){names[String(p.name||'').trim().toLowerCase()]=1;});var n=Object.keys(names).length;
+    return {pct:obj>0?n/obj:0,txt:n+' de '+obj+' productos vendiendo'};}
+  if(g.tipo==='manual'){var d=Number(g.logrado)||0;return {pct:obj>0?d/obj:0,txt:d.toLocaleString('es-CO')+' de '+obj.toLocaleString('es-CO')};}
+  var ts=S.tasks.filter(function(x){return x.goal===g.id&&x.status!=='Descartada';}),ok=ts.filter(function(x){return x.status==='Hecha';}).length;
+  if(!ts.length&&g.oldTareas&&g.oldTareas.total)return {pct:g.oldTareas.ok/g.oldTareas.total,txt:g.oldTareas.ok+' de '+g.oldTareas.total+' tareas completadas (en el viejo)'};
+  return {pct:ts.length?ok/ts.length:0,txt:ts.length?ok+' de '+ts.length+' tareas completadas':'Sin tareas conectadas todavía'};
+}
+function goalDone(g){return !!g.completada||goalProgress(g).pct>=1;}
+function goalOptions(cur){return [['','Ninguna']].concat(S.goals.filter(function(g){return !g.completada||g.id===cur;}).sort(function(a,b){return String(a.titulo).localeCompare(String(b.titulo));}).map(function(g){return [g.id,g.titulo];}));}
+function monthRange(){var m=iso(today()).slice(0,7);return [m+'-01',m+'-31'];}
+function gRange(){var f=UI.gf,t=today(),h=iso(t);
+  if(f.modo==='todo')return null;if(f.modo==='hoy')return [h,h];
+  if(f.modo==='semana'){var a=new Date(t);a.setDate(a.getDate()-((a.getDay()+6)%7));var b=new Date(a);b.setDate(b.getDate()+6);return [iso(a),iso(b)];}
+  if(f.modo==='mesX'&&f.mes)return [f.mes+'-01',f.mes+'-31'];
+  if(f.modo==='rango')return [f.ini||'0000-01-01',f.fin||'9999-12-31'];
+  return monthRange();}
+function goalsIn(r){return S.goals.filter(function(g){if(!r)return true;var a=g.inicio||g.fin,b=g.fin||g.inicio;return !a||(a<=r[1]&&b>=r[0]);})
+  .sort(function(a,b){return String(a.fin||a.inicio||'9').localeCompare(String(b.fin||b.inicio||'9'));});}
+function gLabel(){var f=UI.gf;if(f.modo==='todo')return 'en ninguna fecha';if(f.modo==='hoy')return 'para hoy';if(f.modo==='semana')return 'esta semana';
+  if(f.modo==='mesX'&&f.mes){var p=f.mes.split('-');return 'en '+MESL[+p[1]-1]+' '+p[0];}if(f.modo==='rango')return 'en el rango elegido';return 'este mes';}
+function gMonths(){var set={};set[iso(today()).slice(0,7)]=1;S.goals.forEach(function(g){[g.inicio,g.fin].forEach(function(x){if(x)set[String(x).slice(0,7)]=1;});});return Object.keys(set).sort().reverse();}
+function dayMon(s){var d=parseISO(s);return d?d.getDate()+' '+MES[d.getMonth()]:'';}
+function goalCard(g){
+  var pr=goalProgress(g),ok=goalDone(g),pct=Math.round(Math.min(1,pr.pct)*100);
+  var resp=(g.responsables||[]).map(function(r){return r==='equipo'?'Todo el equipo':r;}).filter(Boolean).join(', ')||'Sin responsable';
+  var fechas=g.inicio&&g.fin&&g.inicio!==g.fin?dayMon(g.inicio)+' al '+dayMon(g.fin):(g.fin||g.inicio)?'Hasta '+dayMon(g.fin||g.inicio):'Sin fecha';
+  var per=(PERIODS.find(function(p){return p[0]===g.periodo;})||['','Sin periodo'])[1];
+  var lbl=g.completada?'Marcar como no cumplida':'Marcar como cumplida';
+  var h='<article class="card goal'+(ok?' ok':'')+'"><div class="ghead"><h3>'+esc(g.titulo)+'</h3><div class="gact">';
+  h+='<button class="iconbtn sm" data-a="gok" data-id="'+g.id+'" aria-label="'+lbl+'" title="'+lbl+'">'+ic(g.completada?'undo':'tick',16)+'</button>';
+  h+='<button class="iconbtn sm" data-a="editgoal" data-id="'+g.id+'" aria-label="Editar meta" title="Editar meta">'+ic('edit',16)+'</button>';
+  h+='<button class="iconbtn sm" data-a="delgoal" data-id="'+g.id+'" aria-label="Borrar meta" title="Borrar meta">'+ic('x',16)+'</button></div></div>';
+  h+='<div class="gchips"><span class="chip n">'+esc(per)+'</span>'+(ok?'<span class="chip g"><span class="dot"></span>Cumplida</span>':'')+'<span class="chip n">'+esc(fechas)+'</span></div>';
+  h+='<div class="gval"><span>'+esc(pr.txt)+'</span><b>'+pct+'%</b></div><div class="bar'+(ok?' ok':'')+'" role="progressbar" aria-label="Avance" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'"><div style="width:'+pct+'%"></div></div>';
+  h+='<div class="sub" style="margin:0">'+esc(resp)+'</div>';
+  if(g.descripcion)h+='<p class="gdesc">'+esc(g.descripcion)+'</p>';
+  return h+'</article>';
+}
+function vMetas(){
+  var gs=goalsIn(gRange()),f=UI.gf;
+  var h=top('Lo que vamos a lograr','Metas',(ME&&ME.role==='admin'?'<button class="btn ghost" style="height:48px" data-a="oldimport" data-w="goals">Traer del Scriptorium viejo</button>':'')+'<button class="btn" data-a="newgoal">'+ic('plus',18)+'Nueva meta</button>');
+  h+=banners();
+  h+='<div class="gfil"><div class="tabs" role="tablist" aria-label="Periodo">'+[['hoy','Hoy'],['semana','Semana'],['mes','Este mes'],['todo','Todo']].map(function(x){return '<button role="tab" aria-selected="'+(f.modo===x[0])+'" data-a="gmodo" data-t="'+x[0]+'">'+x[1]+'</button>';}).join('')+'</div>';
+  h+='<label class="sr" for="gmes">Elegir mes</label><select id="gmes" data-c="gmes" class="btn ghost"><option value="">Otro mes…</option>'+gMonths().map(function(m){var p=m.split('-');return '<option value="'+m+'"'+(f.modo==='mesX'&&f.mes===m?' selected':'')+'>'+cap(MESL[+p[1]-1])+' '+p[0]+'</option>';}).join('')+'</select>';
+  h+='<span class="gr">Rango <input type="date" data-c="gini" aria-label="Desde" value="'+esc(f.modo==='rango'?f.ini:'')+'"><input type="date" data-c="gfin" aria-label="Hasta" value="'+esc(f.modo==='rango'?f.fin:'')+'"></span></div>';
+  h+='<p class="foot" style="font-size:13px">La barra se llena sola: con las tareas conectadas, las ventas del NUCLEA Dashboard o los productos que están vendiendo, según el tipo de meta.</p>';
+  if(!gs.length)h+='<section class="card"><div class="empty">No hay metas '+gLabel()+'.<button class="btn ghost" data-a="newgoal">'+ic('plus',16)+'Nueva meta</button></div></section>';
+  PERIODS.concat([['','Sin periodo']]).forEach(function(p){
+    var grp=gs.filter(function(g){var k=PERIODS.some(function(x){return x[0]===g.periodo;})?g.periodo:'';return k===p[0];});if(!grp.length)return;
+    h+='<section class="gsec"><h2>'+(p[0]?p[1]+'es':p[1])+' <span class="count">'+grp.length+'</span></h2><div class="ggrid">'+grp.map(goalCard).join('')+'</div></section>';});
+  return h;
+}
+function goalForm(g){
+  g=g||{};var isNew=!g.id,t=today(),e=new Date(t);e.setDate(e.getDate()+6);
+  var v=Object.assign({tipo:'tareas',periodo:'semanal',responsables:['equipo'],inicio:iso(t),fin:iso(e)},g);
+  var r0=(v.responsables||[])[0]||'equipo',resp=[['equipo','Todo el equipo']].concat(cfg().members.map(function(m){return [m,m];}));
+  if(!resp.some(function(x){return x[0]===r0;}))resp.push([r0,r0]);
+  var nT=isNew?0:S.tasks.filter(function(x){return x.goal===g.id;}).length;
+  var h='<h2>'+(isNew?'Nueva meta':'Editar meta')+'</h2>';
+  h+=field({name:'titulo',label:'Meta',value:v.titulo,required:true,placeholder:'Ej. 80 ventas diarias'});
+  h+='<div class="frow">'+field({name:'periodo',label:'Periodo',type:'select',value:v.periodo,options:PERIODS})+field({name:'resp',label:'Responsable',type:'select',value:r0,options:resp})+'</div>';
+  h+='<div class="frow">'+field({name:'inicio',label:'Desde',type:'date',value:v.inicio})+field({name:'fin',label:'Hasta',type:'date',value:v.fin})+'</div>';
+  h+=field({name:'tipo',label:'Cómo se mide el avance',type:'select',value:v.tipo,options:GOAL_TYPES});
+  h+='<div id="gobj">'+field({name:'objetivo',label:'Número objetivo',value:v.objetivo?Number(v.objetivo).toLocaleString('es-CO'):'',placeholder:'Ej. 25.000.000 o 80'})+'</div>';
+  h+='<div id="glog">'+field({name:'logrado',label:'Lo logrado hasta hoy',value:v.logrado?Number(v.logrado).toLocaleString('es-CO'):'',placeholder:'Ej. 3'})+'</div>';
+  h+='<label class="field chk" id="gdia"><input type="checkbox" name="diaria" value="1"'+(v.diaria?' checked':'')+'>Es una meta diaria (se mide con las ventas de hoy)</label>';
+  h+='<p class="sub" id="gtasks" style="margin:0">'+(isNew?'Después de crearla, conecta tareas desde cada tarea, en el campo Meta.':nT+' tarea'+(nT===1?'':'s')+' conectada'+(nT===1?'':'s')+'. Conéctalas desde cada tarea, en el campo Meta.')+'</p>';
+  h+=field({name:'descripcion',label:'Descripción',type:'textarea',value:v.descripcion,rows:2});
+  h+='<div class="mrow">'+(isNew?'':'<button type="button" class="btn danger sm" data-a="mdelete">Borrar meta</button>')+'<span class="spacer"></span><button type="button" class="btn ghost" data-a="mclose">Cancelar</button><button type="submit" class="btn dark">'+(isNew?'Crear meta':'Guardar cambios')+'</button></div>';
+  openModal(h,function(x){
+    var d={titulo:x.titulo,periodo:x.periodo,inicio:x.inicio,fin:x.fin,tipo:x.tipo,responsables:[x.resp||'equipo'],
+      objetivo:x.tipo==='tareas'?0:parseNum(x.objetivo),logrado:x.tipo==='manual'?parseNum(x.logrado):0,diaria:x.tipo==='ventas'&&(x.diaria||[]).length>0,descripcion:x.descripcion||''};
+    if(!d.titulo)return false;
+    if(d.tipo!=='tareas'&&!d.objetivo){toast('Escribe el número objetivo.');return false;}
+    if(d.inicio&&d.fin&&d.fin<d.inicio){toast('La fecha final no puede ser antes de la inicial.');return false;}
+    if(isNew)store.add('goals',d).then(function(id){if(id)toast('Meta creada');});else store.update('goals',g.id,d).then(function(){toast('Guardado');});
+    return true;});
+  UI.mdelete=isNew?null:function(){if(!confirmTwice('delg'+g.id))return false;delGoal(g.id);return true;};
+  goalFormToggle();
+}
+function goalFormToggle(){var s=document.querySelector('.modal [name=tipo]');if(!s)return;var t=s.value;
+  [['gobj',t!=='tareas'],['glog',t==='manual'],['gdia',t==='ventas'],['gtasks',t==='tareas']].forEach(function(x){var el=document.getElementById(x[0]);if(el)el.hidden=!x[1];});}
+function delGoal(id){S.tasks.filter(function(x){return x.goal===id;}).forEach(function(x){store.update('tasks',x.id,{goal:''});});store.remove('goals',id);toast('Meta borrada');}
+// Las "Metas del mes" que se escribían a mano en Inicio pasan una sola vez a la sección Metas.
+function moveLegacyGoals(){
+  var old=(S.config&&S.config.goals)||[];if(!old.length||S.config.goalsMoved||!ME||ME.role!=='admin')return;
+  var r=monthRange();store.setConfig({goalsMoved:true});
+  old.forEach(function(x){if(!x||!x.label)return;store.add('goals',{titulo:x.label,periodo:'mensual',inicio:r[0],fin:iso(new Date(today().getFullYear(),today().getMonth()+1,0)),tipo:'manual',objetivo:Number(x.total)||1,logrado:Number(x.done)||0,responsables:['equipo'],descripcion:'',completada:false});});
 }
 
 function vProductos(){
@@ -691,7 +833,8 @@ function fsList(tok,col){var out=[];function page(pt){return fetch('https://fire
   .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error((j.error&&j.error.message)||('Error '+r.status));return j;});})
   .then(function(j){(j.documents||[]).forEach(function(d){var o=fsVal({mapValue:{fields:d.fields||{}}});o.id=d.name.split('/').pop();out.push(o);});return j.nextPageToken?page(j.nextPageToken):out;});}return page('');}
 var OLD_WHAT={found:{title:'productos encontrados',intro:'Se traen todos los productos encontrados con su calificación, estado, nicho, anuncios, enlaces, descripción y notas.'},
-  lines:{title:'líneas',intro:'Se traen todas las líneas en cualquier estado menos Vendiendo, con su número, celular, operador, quién la maneja, días de calentamiento y notas.'}};
+  lines:{title:'líneas',intro:'Se traen todas las líneas en cualquier estado menos Vendiendo, con su número, celular, operador, quién la maneja, días de calentamiento y notas.'},
+  goals:{title:'metas',intro:'Se traen todas las metas con su periodo, fechas, responsable, cómo se mide, número objetivo, descripción y si ya estaba cumplida. En las metas por tareas se guarda cuántas tareas se completaron allá.'}};
 function oldImportForm(what){what=what||'found';
   form({title:'Traer '+OLD_WHAT[what].title+' del Scriptorium viejo',intro:'Entra con tu correo y clave del Scriptorium viejo. '+OLD_WHAT[what].intro+' Lo que ya se trajo no se duplica. La clave no se guarda.',
     fields:[{name:'email',label:'Correo',type:'email',required:true},{name:'pass',label:'Clave',type:'password',required:true}],submit:'Traer',
@@ -708,8 +851,9 @@ function oldImport(email,pass,what){
   fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+OLD_FB.key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pass,returnSecureToken:true})})
   .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(/INVALID|PASSWORD|EMAIL/.test(j.error&&j.error.message||'')?'Correo o clave incorrectos':'No se pudo entrar al Scriptorium viejo');return j.idToken;});})
   .then(function(tok){var soft=function(c){return fsList(tok,c).catch(function(){return [];});};
+    if(what==='goals')return oldGoals(tok,soft).then(function(){return null;});
     return Promise.all([what==='lines'?fsList(tok,'sc_lineas'):fsList(tok,'sc_encontrados'),soft('sc_productos'),soft('sc_usuarios'),what==='lines'?soft('sc_tareas'):Promise.resolve([])]);})
-  .then(function(res){var src=res[0],prods=res[1],users={},tasks=res[3];res[2].forEach(function(u){users[u.id]=u.nombre||u.email||'';});
+  .then(function(res){if(!res)return;var src=res[0],prods=res[1],users={},tasks=res[3];res[2].forEach(function(u){users[u.id]=u.nombre||u.email||'';});
     var col=what==='lines'?'lines':'found',have={};S[col].forEach(function(x){if(x.oldId)have[x.oldId]=1;});
     var todo=src.filter(function(e){return !have[e.id];}).map(what==='lines'?function(l){
       var p=l.productoId&&prods.find(function(x){return x.id===l.productoId;}),ps=oldProdState(p,tasks);
@@ -732,6 +876,25 @@ function oldImport(email,pass,what){
     if(!todo.length){toast(src.length?'No había nada nuevo para traer':'El Scriptorium viejo no tiene '+label[1]);return;}
     return Promise.all(todo.map(function(d){return store.add(col,d);})).then(function(){toast('Listo: '+todo.length+' '+label[todo.length===1?0:1]+' del Scriptorium viejo');if(what==='found')UI.ptab='encontrados';render();});})
   .catch(function(e){toast(e.message||'No se pudo traer');});
+}
+// Metas del viejo (sc_metas). Responsables: uid → nombre; 'equipo' se queda igual.
+function oldGoals(tok,soft){
+  return Promise.all([fsList(tok,'sc_metas'),soft('sc_usuarios'),soft('sc_tareas')]).then(function(res){
+    var src=res[0],users={},tasks=res[2],have={},types=GOAL_TYPES.map(function(x){return x[0];});
+    res[1].forEach(function(u){users[u.id]=u.nombre||u.email||'';});
+    S.goals.forEach(function(g){if(g.oldId)have[g.oldId]=1;});
+    var todo=src.filter(function(m){return !have[m.id];}).map(function(m){
+      var resp=(m.responsables||[]).map(function(r){return r==='equipo'?'equipo':(users[r]||'');}).filter(Boolean).concat((m.legacyResp||[]).filter(Boolean));
+      var ts=tasks.filter(function(t){return (t.metaIds||[]).indexOf(m.id)>=0;});
+      var d={oldId:m.id,titulo:m.titulo||'Sin nombre',periodo:m.periodo||'',inicio:String(m.inicio||'').slice(0,10),fin:String(m.fin||'').slice(0,10),
+        tipo:types.indexOf(m.tipo)>=0?m.tipo:'tareas',objetivo:Number(m.objetivo)||0,diaria:!!m.diaria,responsables:resp.length?resp:['equipo'],
+        descripcion:m.descripcion||'',completada:!!m.completada,source:'Scriptorium viejo'};
+      if(ts.length)d.oldTareas={ok:ts.filter(function(t){return t.estado==='completada';}).length,total:ts.length};
+      return d;});
+    if(!todo.length){toast(src.length?'No había nada nuevo para traer':'El Scriptorium viejo no tiene metas');return;}
+    return Promise.all(todo.map(function(d){return store.add('goals',d);})).then(function(){
+      toast('Listo: '+todo.length+' meta'+(todo.length===1?'':'s')+' del Scriptorium viejo');UI.gf={modo:'todo',mes:'',ini:'',fin:''};render();});
+  });
 }
 function foundNotes(id){
   var f=byId('found',id);if(!f)return;
@@ -809,6 +972,7 @@ function taskDetail(t){
   h+='<label>Prioridad<select data-c="tfield" data-f="priority" data-id="'+t.id+'">'+['Alta','Media','Baja'].map(function(x){return '<option'+(t.priority===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></label>';
   h+='<label>Producto<select data-c="tfield" data-f="product" data-id="'+t.id+'"><option value="">General</option>'+S.products.map(function(p){return '<option value="'+p.id+'"'+(t.product===p.id?' selected':'')+'>'+esc(pLabel(p))+'</option>';}).join('')+'</select></label>';
   h+='<label>Etapa del producto<select data-c="tfield" data-f="stage" data-id="'+t.id+'"><option value="">Ninguna</option>'+STAGES.map(function(s){return '<option value="'+s[0]+'"'+(t.stage===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('')+'</select></label>';
+  h+='<label>Meta<select data-c="tfield" data-f="goal" data-id="'+t.id+'">'+goalOptions(t.goal).map(function(o){return '<option value="'+esc(o[0])+'"'+((t.goal||'')===o[0]?' selected':'')+'>'+esc(o[1])+'</option>';}).join('')+'</select></label>';
   h+='</div>';
   if(t.notes)h+='<div class="comment">'+esc(t.notes)+'</div>';
   h+='<div class="grp"><div class="mini">Archivos y enlaces</div>';
@@ -904,7 +1068,7 @@ function vAgentes(){
 }
 
 /* ---------- render ---------- */
-var R={inicio:vInicio,productos:vProductos,lineas:vLineas,tareas:vTareas,calendario:vCalendario,agentes:vAgentes,equipo:vEquipo};
+var R={inicio:vInicio,metas:vMetas,productos:vProductos,lineas:vLineas,tareas:vTareas,calendario:vCalendario,agentes:vAgentes,equipo:vEquipo};
 function render(){
   var main=document.getElementById('main');
   var ae=document.activeElement,keep=null;
@@ -980,6 +1144,7 @@ function taskForm(t,preset){
     {name:'due',label:'Fecha límite',type:'date',value:t.due||''},
     {name:'product',label:'Producto',type:'select',value:t.product||(preset&&preset.product)||'',options:[['','General']].concat(S.products.map(function(p){return [p.id,pLabel(p)];}))},
     {name:'stage',label:'Etapa del producto que completa',type:'select',value:t.stage||'',options:[['','Ninguna']].concat(STAGES)},
+    {name:'goal',label:'Meta',type:'select',value:t.goal||(preset&&preset.goal)||'',options:goalOptions(t.goal),hint:'cuenta para el avance de la meta'},
     {name:'notes',label:'Detalle',type:'textarea',value:t.notes,rows:3}
   ],submit:isNew?'Crear tarea':'Guardar',
   onSubmit:function(v){if(!v.title)return false;
@@ -1047,11 +1212,6 @@ function noteForm(n){
   onDelete:isNew?null:function(){store.remove('notes',n.id);return true;},deleteLabel:'Borrar post-it',
   onSubmit:function(v){if(!v.text)return false;if(isNew)store.add('notes',{text:v.text,who:UI.me||''});else store.update('notes',n.id,{text:v.text});return true;}});
 }
-function goalsForm(){
-  var g=cfg().goals;
-  form({title:'Metas del mes',intro:'Una meta por línea, con lo logrado y el total. Ejemplo: Productos nuevos lanzados: 2/4',fields:[{name:'goals',label:'Metas',type:'textarea',rows:5,value:g.map(function(x){return x.label+': '+(x.done||0)+'/'+(x.total||0);}).join('\n')}],
-  onSubmit:function(v){var out=v.goals.split('\n').map(function(line){var m=line.match(/^(.*?)[:\-]\s*(\d+)\s*\/\s*(\d+)\s*$/);return m?{label:m[1].trim(),done:+m[2],total:+m[3]}:(line.trim()?{label:line.trim(),done:0,total:1}:null);}).filter(Boolean);store.setConfig({goals:out});return true;}});
-}
 function whoForm(){
   if(!ME)return;
   var isAdmin=ME.role==='admin';
@@ -1101,7 +1261,7 @@ document.addEventListener('click',function(ev){
     case 'mdelete':if(UI.mdelete&&UI.mdelete()!==false)closeModal();return;
     case 'bell':UI.bell=!UI.bell;render();return;
     case 'whoami':whoForm();return;
-    case 'searchgo':UI.search='';if(el.dataset.k==='task')UI.taskSel=id;if(el.dataset.k==='product'){setTimeout(function(){var p=byId('products',id);if(p)productForm(p);},50);}if(el.dataset.k==='line'){setTimeout(function(){var l=byId('lines',id);if(l)lineForm(l);},50);}return;
+    case 'searchgo':UI.search='';if(el.dataset.k==='task')UI.taskSel=id;if(el.dataset.k==='product'){setTimeout(function(){var p=byId('products',id);if(p)productForm(p);},50);}if(el.dataset.k==='line'){setTimeout(function(){var l=byId('lines',id);if(l)lineForm(l);},50);}if(el.dataset.k==='goal'){UI.gf={modo:'todo',mes:'',ini:'',fin:''};setTimeout(function(){var g=byId('goals',id);if(g)goalForm(g);},50);}return;
     case 'cleardemo':if(!confirmTwice('demo'))return;COLS.forEach(function(c){S[c].filter(function(x){return x.demo;}).forEach(function(x){store.remove(c,x.id);});});if(S.config&&S.config.demoGoals)store.setConfig({goals:[],demoGoals:false});toast('Datos de ejemplo borrados');return;
     case 'newproduct':productForm();return;
     case 'editproduct':productForm(byId('products',id));return;
@@ -1137,7 +1297,11 @@ document.addEventListener('click',function(ev){
     case 'toggledone':UI.showDone=!UI.showDone;render();return;
     case 'newnote':noteForm();return;
     case 'opennote':noteForm(byId('notes',id));return;
-    case 'editgoals':goalsForm();return;
+    case 'newgoal':goalForm();return;
+    case 'editgoal':goalForm(byId('goals',id));return;
+    case 'gok':var gk=byId('goals',id);if(!gk)return;store.update('goals',id,{completada:!gk.completada});toast(gk.completada?'Meta cumplida':'Meta reabierta');return;
+    case 'delgoal':if(!confirmTwice('delg'+id))return;delGoal(id);return;
+    case 'gmodo':UI.gf={modo:el.dataset.t,mes:'',ini:'',fin:''};render();return;
     case 'newevent':eventForm(null,el.dataset.k);return;
     case 'editevent':eventForm(byId('events',id));return;
     case 'editagenda':var e1=byId('events',id);form({title:'Agenda',fields:[{name:'agenda',label:'Puntos de la agenda',type:'textarea',hint:'uno por línea',rows:5,value:e1.agenda}],onSubmit:function(v){store.update('events',id,{agenda:v.agenda});return true;}});return;
@@ -1181,8 +1345,12 @@ document.addEventListener('input',function(ev){
     actaTimer=setTimeout(function(){var e=byId('events',evId);if(!e)return;var actas=Object.assign({},e.actas||{});actas[date]=val;Promise.resolve(store.update('events',evId,{actas:actas})).then(function(){var s2=document.getElementById('actaState');if(s2)s2.innerHTML=ic('tick',14)+'Guardado';});},700);}
 });
 document.addEventListener('change',function(ev){
-  var el=ev.target,c=el.dataset.c;if(!c)return;
+  var el=ev.target,c=el.dataset.c;
+  if(el.name==='tipo'&&document.getElementById('gobj')){goalFormToggle();return;}
+  if(!c)return;
   if(c==='prio'){UI.prio=el.value;render();}
+  else if(c==='gmes'){UI.gf={modo:el.value?'mesX':'mes',mes:el.value,ini:'',fin:''};render();}
+  else if(c==='gini'||c==='gfin'){var gf=UI.gf.modo==='rango'?UI.gf:{modo:'rango',mes:'',ini:'',fin:''};gf[c==='gini'?'ini':'fin']=el.value;UI.gf=gf;render();}
   else if(c==='tfield'){var o={};o[el.dataset.f]=el.value;store.update('tasks',el.dataset.id,o);}
   else if(c==='chsel'){UI.ch=el.value;render();var t0=document.getElementById('msgs');if(t0)t0.scrollTop=t0.scrollHeight;}
   else if(c==='chatprod'){UI.chatProduct=el.value;render();}
@@ -1241,18 +1409,18 @@ function loadAll(){
   var all=[],size=1000;
   function page(from){return sb.from('sc_items').select('id,col,data,created_at').order('created_at').range(from,from+size-1).then(chk).then(function(r){all=all.concat(r.data);return r.data.length===size?page(from+size):all;});}
   return Promise.all([page(0),sb.from('sc_config').select('data').eq('id','main').maybeSingle().then(chk),loadMembers()]).then(function(res){
-    COLS.forEach(function(c){S[c]=[];S.loaded[c]=true;});
+    VCOLS.forEach(function(c){S[c]=[];S.loaded[c]=true;});
     res[0].forEach(upsertLocal);
     S.config=res[1].data?res[1].data.data:{};
     lastLoad=Date.now();scheduleRender();
   });
 }
 function loadMembers(){return sb.from('sc_members').select('user_id,email,name,role').order('name').then(chk).then(function(r){S.members=r.data||[];var me=ME&&S.members.find(function(m){return m.user_id===ME.user_id;});if(me){ME=me;UI.me=me.name;}scheduleRender();});}
-function loadRoas(){return api('/api/roas').then(function(r){ROAS.offers=r.offers||[];ROAS.rows=r.rows||[];ROAS.from=r.from;ROAS.to=r.to;ROAS.updatedAt=r.updatedAt;ROAS.error=r.error||'';ROAS.loaded=!r.error||ROAS.rows.length>0;scheduleRender();}).catch(function(e){ROAS.error='No se pudo leer el ROAS del Dashboard.';console.warn(e);scheduleRender();});}
+function loadRoas(){SALES={};return api('/api/roas').then(function(r){ROAS.offers=r.offers||[];ROAS.rows=r.rows||[];ROAS.from=r.from;ROAS.to=r.to;ROAS.updatedAt=r.updatedAt;ROAS.error=r.error||'';ROAS.loaded=!r.error||ROAS.rows.length>0;scheduleRender();}).catch(function(e){ROAS.error='No se pudo leer el ROAS del Dashboard.';console.warn(e);scheduleRender();});}
 function subscribe(){
   if(channel)sb.removeChannel(channel);
   channel=sb.channel('scriptorium')
-    .on('postgres_changes',{event:'*',schema:'public',table:'sc_items'},function(p){if(p.eventType==='DELETE'){dropLocal(p.old&&p.old.id);}else{var known=p.new&&byId(p.new.col,p.new.id);upsertLocal(p.new);if(p.eventType==='INSERT'&&!known&&p.new&&p.new.col==='chats')onTeamInsert(byId('chats',p.new.id));}scheduleRender();})
+    .on('postgres_changes',{event:'*',schema:'public',table:'sc_items'},function(p){if(p.eventType==='DELETE'){dropLocal(p.old&&p.old.id);}else{var known=p.new&&byId(colOf(p.new)||'notes',p.new.id);upsertLocal(p.new);if(p.eventType==='INSERT'&&!known&&p.new&&p.new.col==='chats')onTeamInsert(byId('chats',p.new.id));}scheduleRender();})
     .on('postgres_changes',{event:'*',schema:'public',table:'sc_config'},function(p){if(p.new&&p.new.id==='main'){S.config=p.new.data||{};scheduleRender();}})
     .on('postgres_changes',{event:'*',schema:'public',table:'sc_members'},function(){loadMembers();})
     .subscribe(function(status){var was=S.live;S.live=status==='SUBSCRIBED';if(S.live&&!was)loadAll();if(was!==S.live)scheduleRender();});
@@ -1260,7 +1428,7 @@ function subscribe(){
 var roasTimer=null,booted=false;
 function bootData(){
   hideGate();route();
-  loadAll().then(function(){if(!booted){booted=true;subscribe();}}).catch(function(e){console.warn(e);showGate('error','No se pudieron leer los datos del equipo.');});
+  loadAll().then(function(){moveLegacyGoals();if(!booted){booted=true;subscribe();}}).catch(function(e){console.warn(e);showGate('error','No se pudieron leer los datos del equipo.');});
   loadRoas();loadMcp();clearInterval(roasTimer);roasTimer=setInterval(loadRoas,10*60*1000);
 }
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&ME&&ME.role!=='pendiente'&&Date.now()-lastLoad>5*60*1000){loadAll().catch(function(){});loadRoas();}});

@@ -1,6 +1,6 @@
 import type { Env } from "./env";
 import { approved, currentMember } from "./auth";
-import { cachedRoas } from "./roas";
+import { cachedRoas, cachedTotals, validRange } from "./roas";
 import { handleMcp } from "./mcp";
 import { syncProducts } from "./sync";
 
@@ -36,6 +36,14 @@ export default {
       // ROAS de los últimos 3 días por producto y país, leído del NUCLEA Dashboard.
       if (path === "/api/roas" && req.method === "GET") {
         return json(await cachedRoas(env, ctx));
+      }
+
+      // Ventas y facturación neta del equipo entre dos fechas, para las metas.
+      if (path === "/api/ventas" && req.method === "GET") {
+        const from = url.searchParams.get("from");
+        const to = url.searchParams.get("to");
+        if (!validRange(from, to)) return json({ error: "Fechas inválidas" }, 400);
+        return json(await cachedTotals(env, ctx, from as string, to as string));
       }
 
       // URL del conector MCP para que el equipo lo agregue en Claude.
