@@ -390,6 +390,25 @@ function lineState(l){
   if(st==='calentando'){var s=parseISO(l.warmStart);if(s){var day=daysBetween(s,today())+1;if(day>WARM_DAYS){var ready=new Date(s);ready.setDate(ready.getDate()+WARM_DAYS);return {status:'disponible',readySince:iso(ready)};}return {status:'calentando',day:Math.max(1,day)};}return {status:'calentando',day:1};}
   return {status:st};
 }
+// Línea <-> producto: una línea vende un producto y un producto usa una línea.
+// Se guarda en los dos lados (line.product y product.line) y esta función los mantiene iguales.
+function linkLine(lineId,productId){
+  var L=lineId?byId('lines',lineId):null,P=productId?byId('products',productId):null;
+  var free=function(x){var d={product:''};if((x.status||'')==='vendiendo')d.status='disponible';store.update('lines',x.id,d);};
+  // soltar la línea que tenía este producto
+  if(P)S.lines.forEach(function(x){if(x.product===P.id&&(!L||x.id!==L.id))free(x);});
+  // soltar el producto que tenía esta línea
+  if(L)S.products.forEach(function(x){if((!P||x.id!==P.id)&&(x.id===L.product||(x.line&&String(x.line)===String(L.num))))store.update('products',x.id,{line:''});});
+  if(L&&!P){if(L.product)free(L);return;}
+  if(P&&!L){if(P.line)store.update('products',P.id,{line:''});return;}
+  if(L&&P){
+    if(L.product!==P.id||L.status!=='vendiendo')store.update('lines',L.id,{product:P.id,status:'vendiendo'});
+    var pd={};if(String(P.line||'')!==String(L.num))pd.line=String(L.num);if(!P.phone&&L.phone)pd.phone=L.phone;
+    if(Object.keys(pd).length)store.update('products',P.id,pd);
+  }
+}
+function lineOf(p){return S.lines.find(function(l){return l.product===p.id;})||null;}
+function pLineNum(p){var l=lineOf(p);return l?String(l.num):(p.line||'');}
 function sortNum(a,b){return String(a.num).localeCompare(String(b.num),undefined,{numeric:true});}
 function myTasks(){var me=UI.me;return S.tasks.filter(function(t){return (!me||t.who===me)&&(t.status==='Pendiente'||t.status==='En curso');});}
 var PR={Alta:0,Media:1,Baja:2};
@@ -518,7 +537,7 @@ function productMini(p){
   return '<button class="prow pm" data-a="editproduct" data-id="'+p.id+'"><span class="nm">'+esc(pLabel(p))+'</span><span class="chips">'+(cs.length?cs.map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.country?p.country+' · ':'')+(p.offer?'Sin pauta':'Sin países')+'</span>')+'</span></button>';
 }
 function productRow(p){
-  var meta=[];if(p.line)meta.push('Línea '+p.line);if(p.phone)meta.push(p.phone);if(p.avatar)meta.push('Avatar: '+p.avatar);
+  var meta=[];if(pLineNum(p))meta.push('Línea '+pLineNum(p));if(p.phone)meta.push(p.phone);if(p.avatar)meta.push('Avatar: '+p.avatar);
   return '<button class="prow" data-a="editproduct" data-id="'+p.id+'"><div style="flex:1 1 220px;min-width:0"><div class="nm">'+esc(pLabel(p))+'</div><div class="mt">'+esc(meta.join(' · ')||'Sin línea asignada')+'</div></div><div class="chips" style="flex:1 1 260px;justify-content:flex-end">'+(pCountries(p).length?pCountries(p).map(chip).join(''):'<span class="chip n"><span class="dot"></span>'+(p.country?p.country+' · ':'')+(p.offer?'Sin pauta en 3 días':'Sin países')+'</span>')+'</div></button>';
 }
 function taskRow(t){
@@ -547,7 +566,7 @@ function productCard(p){
   var open=!!UI.pOpen[p.id];
   h+='<button type="button" class="pmore" data-a="pmore" data-id="'+p.id+'" aria-expanded="'+open+'">'+(open?'Ver menos':'Ver más')+ic(open?'up':'down',16)+'</button>';
   if(!open)return h+'</article>';
-  h+='<dl class="facts"><div><dt>Línea</dt><dd>'+esc(p.line||'—')+'</dd></div><div><dt>Celular</dt><dd>'+esc(p.phone||'—')+'</dd></div><div><dt>Avatar</dt><dd>'+esc(p.avatar||'—')+'</dd></div></dl>';
+  h+='<dl class="facts"><div><dt>Línea</dt><dd>'+esc(pLineNum(p)||'—')+'</dd></div><div><dt>Celular</dt><dd>'+esc(p.phone||'—')+'</dd></div><div><dt>Avatar</dt><dd>'+esc(p.avatar||'—')+'</dd></div></dl>';
   h+='<div><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:8px"><span>Etapas</span><span style="color:var(--fg);font-weight:600">'+done+' de 5</span></div><div class="stages">';
   STAGES.forEach(function(s){h+='<button class="stage'+(st[s[0]]?' on':'')+'" data-a="stage" data-id="'+p.id+'" data-s="'+s[0]+'" aria-pressed="'+(!!st[s[0]])+'">'+s[1]+'</button>';});
   h+='</div></div>';
@@ -767,11 +786,11 @@ function fdObj(formEl){var o={};var els=formEl.elements;for(var i=0;i<els.length
 function productForm(p){
   p=p||{};var isNew=!p.id;
   var lineOpts=[['','Sin línea']].concat(S.lines.slice().sort(sortNum).map(function(l){return [String(l.num),'Línea '+l.num+(l.phone?' · '+l.phone:'')];}));
-  if(p.line&&!lineOpts.some(function(o){return o[0]===String(p.line);}))lineOpts.push([String(p.line),'Línea '+p.line]);
+  var curLine=isNew?'':pLineNum(p);if(curLine&&!lineOpts.some(function(o){return o[0]===curLine;}))lineOpts.push([curLine,'Línea '+curLine]);
   form({title:isNew?'Nuevo producto':'Editar producto',fields:[
     {name:'name',label:'Nombre',value:p.name,required:true},
     {name:'status',label:'Estado',type:'select',value:p.status||'activo',options:[['activo','Activo'],['apagado','Apagado'],['archivado','Archivado']]},
-    {name:'line',label:'Línea',type:'select',value:p.line||'',options:lineOpts},
+    {name:'line',label:'Línea',type:'select',value:curLine,options:lineOpts,hint:'se conecta sola en Líneas'},
     {name:'phone',label:'Celular',value:p.phone,placeholder:'Cel. 3'},
     {name:'avatar',label:'Avatar',value:p.avatar,placeholder:'Nombre del avatar'},
     {name:'offer',label:'Oferta en el NUCLEA Dashboard',type:'select',value:p.offer||'',hint:'el ROAS por país se lee solo',options:[['','Sin conectar']].concat(ROAS.offers.filter(function(o){return !o.archived||o.id===p.offer;}).map(function(o){return [o.id,o.name];})).concat(p.offer&&!offerName(p.offer)?[[p.offer,'Oferta no encontrada']]:[])},
@@ -782,11 +801,12 @@ function productForm(p){
     {name:'lv',label:'Enlace a videos',value:(p.links||{}).videos,type:'url',placeholder:'https://'},
     {name:'ld',label:'Carpeta en Drive',value:(p.links||{}).drive,type:'url',placeholder:'https://'}
   ],submit:isNew?'Crear producto':'Guardar',
-  onDelete:isNew?null:function(){if(!confirmTwice('delp'+p.id))return false;store.remove('products',p.id);toast('Producto borrado');return true;},deleteLabel:'Borrar producto',
+  onDelete:isNew?null:function(){if(!confirmTwice('delp'+p.id))return false;linkLine(null,p.id);store.remove('products',p.id);toast('Producto borrado');return true;},deleteLabel:'Borrar producto',
   onSubmit:function(v){if(!v.name)return false;var st={};STAGES.forEach(function(s){st[s[0]]=v.stages.indexOf(s[0])>=0;});
-    var data={name:v.name,country:String(v.country||'').trim().toUpperCase().slice(0,3),status:v.status,line:v.line,phone:v.phone,avatar:v.avatar,offer:v.offer,countries:parseCountries(v.countries),stages:st,links:{guiones:v.lg,videos:v.lv,drive:v.ld}};
-    if(isNew)store.add('products',data).then(function(){toast('Producto creado');});else store.update('products',p.id,data).then(function(){toast('Guardado');});
-    if(v.line){var l=S.lines.find(function(x){return String(x.num)===v.line;});if(l&&isNew===false&&l.product!==p.id&&v.status==='activo')store.update('lines',l.id,{status:'vendiendo',product:p.id});}
+    var data={name:v.name,country:String(v.country||'').trim().toUpperCase().slice(0,3),status:v.status,phone:v.phone,avatar:v.avatar,offer:v.offer,countries:parseCountries(v.countries),stages:st,links:{guiones:v.lg,videos:v.lv,drive:v.ld}};
+    var ln=v.line?S.lines.find(function(x){return String(x.num)===v.line;}):null;
+    if(isNew)store.add('products',data).then(function(pid){toast('Producto creado');if(ln&&pid)setTimeout(function(){linkLine(ln.id,pid);},300);});
+    else{store.update('products',p.id,data).then(function(){toast('Guardado');});if((v.line||'')!==curLine)linkLine(ln?ln.id:null,p.id);}
     return true;}});
 }
 var confirmState={};
@@ -814,7 +834,7 @@ function setTaskStatus(t,s){
 function lineForm(l,assign){
   l=l||{};var isNew=!l.id;
   if(assign){form({title:'Asignar producto a la línea '+l.num,fields:[{name:'product',label:'Producto',type:'select',value:'',options:activeProducts().map(function(p){return [p.id,pLabel(p)];})}],submit:'Asignar',
-    onSubmit:function(v){if(!v.product)return false;store.update('lines',l.id,{status:'vendiendo',product:v.product});store.update('products',v.product,{line:String(l.num),phone:byId('products',v.product).phone||l.phone||''});toast('Línea '+l.num+' vendiendo');return true;}});return;}
+    onSubmit:function(v){if(!v.product)return false;linkLine(l.id,v.product);toast('Línea '+l.num+' vendiendo con '+productName(v.product));return true;}});return;}
   form({title:isNew?'Nueva línea':'Línea '+l.num,fields:[
     {name:'num',label:'Número de línea',value:l.num,required:true,placeholder:'15'},
     {name:'phone',label:'Celular',value:l.phone,placeholder:'Cel. 2'},
@@ -823,8 +843,13 @@ function lineForm(l,assign){
     {name:'product',label:'Producto conectado',type:'select',value:l.product||'',options:[['','Ninguno']].concat(S.products.map(function(p){return [p.id,pLabel(p)];}))},
     {name:'note',label:'Nota',value:l.note}
   ],submit:isNew?'Crear línea':'Guardar',
-  onDelete:isNew?null:function(){if(!confirmTwice('dell'+l.id))return false;store.remove('lines',l.id);return true;},deleteLabel:'Borrar línea',
-  onSubmit:function(v){if(!v.num)return false;if(isNew)store.add('lines',v).then(function(){toast('Línea creada');});else store.update('lines',l.id,v);return true;}});
+  onDelete:isNew?null:function(){if(!confirmTwice('dell'+l.id))return false;linkLine(l.id,null);store.remove('lines',l.id);return true;},deleteLabel:'Borrar línea',
+  onSubmit:function(v){if(!v.num)return false;var prod=v.product;delete v.product;
+    if(isNew){if(prod)v.status='vendiendo';store.add('lines',v).then(function(lid){toast('Línea creada');if(prod&&lid)setTimeout(function(){linkLine(lid,prod);},300);});return true;}
+    var oldNum=String(l.num);store.update('lines',l.id,v);
+    if(prod!==(l.product||''))setTimeout(function(){linkLine(l.id,prod||null);},50);
+    else if(prod&&String(v.num)!==oldNum)store.update('products',prod,{line:String(v.num)});
+    return true;}});
 }
 function foundForm(f){
   f=f||{};var isNew=!f.id;
