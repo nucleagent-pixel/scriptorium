@@ -10,7 +10,7 @@ Corre en **Cloudflare Workers** (página + API) con **Supabase** como base de da
 - **Semáforo de ROAS automático**: cada producto se conecta a una oferta del NUCLEA Dashboard y muestra el ROAS por país de los últimos 3 días (hoy y los 2 anteriores, hora de Colombia). ROAS = facturación neta ÷ pauta. Verde 1.80 o más, ámbar 1.43 a 1.79, rojo 1.42 o menos; bajo 1.25 aparece *apagar*. Se refresca cada 10 minutos. Un producto sin oferta conectada puede llevar el ROAS a mano.
 - **Agentes en Claude con el conector MCP**: cada agente se usa dentro de Claude con su skill (desarrollo de producto, creadora de producto, editar reel) y la suscripción de cada persona. Con el conector, Claude lee productos, ROAS y tareas de Scriptorium y guarda las entregas de vuelta en el producto. La pantalla Agentes arma el mensaje de inicio, abre Claude y muestra las entregas guardadas.
 
-Siguiente fase: sincronización con Google Calendar.
+- **Google Calendar (fase 3)**: un admin conecta la cuenta de Google del equipo y elige el calendario. Las reuniones y fechas que se agendan en Scriptorium se crean en Google (con Meet automático e invitación por correo a los invitados del equipo) y lo que se agenda en Google aparece en Scriptorium (cada 15 minutos y al abrir Calendario). Agenda y actas quedan en Scriptorium.
 
 ## Conector MCP (para Claude)
 
@@ -50,7 +50,21 @@ Scriptorium puede usar **el mismo proyecto de Supabase del Dashboard** (un solo 
    | `DASH_SUPABASE_URL` | **solo si** el Dashboard está en otro proyecto: su URL |
    | `DASH_SUPABASE_KEY` | **solo si** el Dashboard está en otro proyecto: su llave service_role |
 
+   | `GOOGLE_CLIENT_ID` | ID de cliente OAuth de Google (ver *Google Calendar* abajo) |
+   | `GOOGLE_CLIENT_SECRET` | Secreto de ese cliente |
+
 4. Desde ahora, cada cambio que se suba a `main` se publica solo.
+
+### Google Calendar
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → crea un proyecto (por ejemplo *Scriptorium*).
+2. **APIs y servicios → Biblioteca** → busca **Google Calendar API** → **Habilitar**.
+3. **APIs y servicios → Pantalla de consentimiento de OAuth** (o *Google Auth Platform*): tipo **Externo** (o **Interno** si es Google Workspace), nombre *Scriptorium*, tu correo. En **Permisos (scopes)** agrega `.../auth/calendar`. Luego en **Público** dale **Publicar app** (en modo *Prueba* Google corta el permiso cada 7 días). Al conectar saldrá *"Google no verificó esta app"*: **Configuración avanzada → Ir a Scriptorium**.
+4. **Credenciales → Crear credenciales → ID de cliente de OAuth** → tipo **Aplicación web**. En **URIs de redireccionamiento autorizados** agrega `https://scriptorium.nucleagentes.workers.dev/oauth/google/callback` (si usas otro dominio, agrega también ese con `/oauth/google/callback`).
+5. Copia el **ID de cliente** y el **Secreto** a Cloudflare como `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (Secret).
+6. En Scriptorium, como admin: **Calendario → Conectar Google Calendar**, acepta, y si no quieres el calendario principal, **Cambiar calendario**.
+
+La zona horaria de las reuniones es `GCAL_TZ` en `wrangler.toml` (por defecto `America/Bogota`). El permiso de Google se guarda cifrado en `sc_config` (fila `google`); no hace falta correr SQL nuevo.
 
 ### 3. Primer ingreso
 

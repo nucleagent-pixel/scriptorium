@@ -11,15 +11,18 @@ keep_vars = true
 directory = "./public"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-run_worker_first = ["/api/*", "/mcp", "/mcp/*"]
+run_worker_first = ["/api/*", "/mcp", "/mcp/*", "/oauth/*"]
 
 [vars]
 # El semáforo de ROAS cuenta desde esta fecha (ventana de 3 días que no empieza antes).
 ROAS_START = "2026-11-11"
+# Zona horaria de las reuniones que se envían a Google Calendar.
+GCAL_TZ = "America/Bogota"
 
-# Los secretos (SUPABASE_*, DASH_SUPABASE_*, MCP_KEY) se cargan en el panel de
+# Los secretos (SUPABASE_*, DASH_SUPABASE_*, MCP_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET) se cargan en el panel de
 # Cloudflare (Settings → Variables and Secrets).
 
-# Cada hora: ofertas nuevas del Dashboard → productos de Scriptorium.
+# Minuto 15 de cada hora: ofertas nuevas del Dashboard → productos de Scriptorium.
+# Cada 15 minutos: cambios de Google Calendar → Scriptorium.
 [triggers]
-crons = ["15 * * * *"]
+crons = ["15 * * * *", "0,30,45 * * * *"]

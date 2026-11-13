@@ -425,6 +425,7 @@ var VCOLS=COLS.concat(['goals']);
 function colOf(r){return r&&r.col==='notes'&&r.data&&r.data.kind==='goal'?'goals':r&&r.col;}
 var S={products:[],found:[],lines:[],tasks:[],notes:[],events:[],chats:[],deliverables:[],goals:[],members:[],config:null,loaded:{},live:true};
 var sb=null, SESSION=null, ME=null, channel=null, lastLoad=0;
+var GCAL={loaded:false,configured:false,connected:false,email:null,calendarName:null,lastPull:null,error:null};
 var ROAS={loaded:false,offers:[],rows:[],from:'',to:'',updatedAt:'',error:''};
 var UI={view:'inicio',ptab:'activos',taskSel:null,taskScope:'mine',prio:'todas',showDone:false,showBlocked:false,
   calMonth:null,calSel:null,agent:'desarrollador',chatId:null,chatProduct:'',pending:false,draft:'',atts:[],search:'',bell:false,me:'',pOpen:{},gf:{modo:'mes',mes:'',ini:'',fin:''}};
@@ -1020,7 +1021,8 @@ function vCalendario(){
     var d0=parseISO(sel.date);var n=daysBetween(today(),d0);
     h+='<section class="meeting"><div class="lbl">'+(n===0?'Hoy':n===1?'Mañana':n<0?'Pasada':'Próxima')+' · '+(ev.kind==='reunion'?'Reunión':'Fecha importante')+'</div><div><div class="ttl">'+esc(ev.title)+'</div><div class="when">'+esc(longDate(d0)+(ev.time?' · '+fmtTime(ev.time)+(ev.end?' a '+fmtTime(ev.end):''):'')+(ev.repeat&&ev.repeat!=='no'?' · se repite '+ev.repeat:''))+'</div></div>';
     if(ev.guests&&ev.guests.length)h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="display:flex">'+ev.guests.map(function(g,i){return '<span class="who" style="border:2px solid var(--ink);margin-left:'+(i?'-8px':'0')+'" title="'+esc(g)+'">'+esc(initials(g))+'</span>';}).join('')+'</div><span style="font-size:13px;color:#CFCFC8">'+ev.guests.length+' invitados</span></div>';
-    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+(ev.meet?'<a class="btn" href="'+esc(safeUrl(ev.meet))+'" target="_blank" rel="noopener">'+ic('video',18)+'Unirse con Meet</a>':'')+'<button class="btn ghost" style="height:44px;background:transparent;color:var(--inkfg);border-color:#444" data-a="editevent" data-id="'+ev.id+'">Editar</button></div></section>';
+    var glink=ev.gcal&&ev.gcal.link?'<a class="btn ghost" style="height:44px;background:transparent;color:var(--inkfg);border-color:#444" href="'+esc(safeUrl(ev.gcal.link))+'" target="_blank" rel="noopener">Ver en Google</a>':'';
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap">'+(ev.meet?'<a class="btn" href="'+esc(safeUrl(ev.meet))+'" target="_blank" rel="noopener">'+ic('video',18)+'Unirse con Meet</a>':'')+'<button class="btn ghost" style="height:44px;background:transparent;color:var(--inkfg);border-color:#444" data-a="editevent" data-id="'+ev.id+'">Editar</button>'+glink+'</div></section>';
     if(ev.kind==='reunion'){
       var ag=String(ev.agenda||'').split('\n').filter(function(x){return x.trim();});
       h+='<section class="card pad24" style="gap:12px"><div class="cardhead" style="align-items:center"><h2 style="font-size:20px">Agenda</h2><button class="iconbtn sm" data-a="editagenda" data-id="'+ev.id+'" aria-label="Editar agenda">'+ic('edit',16)+'</button></div>';
@@ -1033,8 +1035,24 @@ function vCalendario(){
     if(past.length)h+='<section class="card pad24" style="gap:8px"><div class="mini">Actas anteriores</div>'+past.slice(0,6).map(function(k){var dd=parseISO(k);return '<button class="sitem" data-a="calsel" data-ev="'+ev.id+'" data-date="'+k+'"><div class="st">'+esc(longDate(dd))+'</div><div class="sm">'+esc(String(ev.actas[k]).slice(0,80))+'</div></button>';}).join('')+'</section>';
   }
   h+='</div></div>';
-  h+='<p class="foot">Las reuniones se agendan aquí. La conexión con Google Calendar llega en la siguiente versión.</p>';
+  h+=gcalCard();
   return h;
+}
+
+function gcalCard(){
+  if(!GCAL.loaded)return '';
+  var admin=ME&&ME.role==='admin';
+  var h='<section class="card pad24" style="gap:10px;margin-top:16px"><div class="cardhead" style="align-items:center"><div><h2 style="font-size:20px">Google Calendar</h2>';
+  if(!GCAL.connected){
+    h+='<p class="sub" style="margin:4px 0 0">'+(!GCAL.configured?'Falta configurar Google en Cloudflare (GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET).':admin?'Conecta la cuenta de Google del equipo. Las reuniones que agenden aquí aparecen allá con su Meet e invitación, y lo que agenden en Google aparece aquí.':'Todavía no está conectado. Un admin lo conecta desde aquí.')+'</p></div>';
+    if(admin&&GCAL.configured)h+='<button class="btn" data-a="gconnect">'+ic('cal',18)+'Conectar Google Calendar</button>';
+    return h+'</div></section>';
+  }
+  var last=GCAL.lastPull?new Date(GCAL.lastPull):null;
+  h+='<p class="sub" style="margin:4px 0 0">Conectado a <b>'+esc(GCAL.calendarName||'Principal')+'</b>'+(GCAL.email?' ('+esc(GCAL.email)+')':'')+(last?' · revisado a las '+pad(last.getHours())+':'+pad(last.getMinutes()):'')+'. Se sincroniza solo cada 15 minutos.</p></div>';
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" data-a="gsync">Sincronizar ahora</button>'+(admin?'<button class="btn ghost" data-a="gcalpick">Cambiar calendario</button><button class="btn ghost" data-a="gdisconnect">Desconectar</button>':'')+'</div></div>';
+  if(GCAL.error)h+='<div class="banner info"><span>'+esc(GCAL.error)+'</span>'+(admin?'<button class="btn ghost" data-a="gconnect">Volver a conectar</button>':'')+'</div>';
+  return h+'</section>';
 }
 
 var AGENTS=[
@@ -1091,7 +1109,7 @@ function render(){
   if(keep){var el=document.getElementById(keep.id);if(el){el.value=keep.v;el.focus();try{el.setSelectionRange(keep.s,keep.e);}catch(e){}}}
   var m2=document.getElementById('msgs');if(m2&&atBottom)m2.scrollTop=m2.scrollHeight;
 }
-function route(){var h=(location.hash||'').replace('#','');UI.view=R[h]?h:'inicio';UI.bell=false;UI.search='';render();window.scrollTo(0,0);}
+function route(){var h=(location.hash||'').replace('#','');UI.view=R[h]?h:'inicio';UI.bell=false;UI.search='';if(UI.view==='calendario')gcalPull();render();window.scrollTo(0,0);}
 
 /* ---------- modal forms ---------- */
 var modalSubmit=null;
@@ -1210,13 +1228,13 @@ function eventForm(e,kind){
   var fields=[{name:'title',label:'Título',value:e.title||(kind==='reunion'?'Reunión semanal':''),required:true},{name:'date',label:'Fecha',type:'date',value:e.date||iso(today())}];
   if(kind==='reunion')fields=fields.concat([{name:'time',label:'Hora de inicio',type:'time',value:e.time||'09:00'},{name:'end',label:'Hora de fin',type:'time',value:e.end||'09:45'},
     {name:'repeat',label:'Se repite',type:'select',value:e.repeat||'no',options:[['no','No se repite'],['semanal','Cada semana'],['mensual','Cada mes, el mismo día']]},
-    {name:'meet',label:'Enlace de Meet',type:'url',value:e.meet,placeholder:'https://meet.google.com/…'},
+    {name:'meet',label:'Enlace de Meet',type:'url',value:e.meet,placeholder:'https://meet.google.com/…',hint:GCAL.connected&&!(e.gcal&&e.gcal.google)?'si lo dejas vacío, Google crea uno':''},
     {name:'guests',label:'Invitados',type:'checks',value:e.guests||m,options:m.map(function(x){return [x,x];})},
     {name:'agenda',label:'Agenda',type:'textarea',value:e.agenda,hint:'un punto por línea',rows:4}]);
   else fields.push({name:'notes',label:'Nota',type:'textarea',value:e.notes,rows:3});
   form({title:isNew?(kind==='reunion'?'Agendar reunión':'Fecha importante'):'Editar',fields:fields,submit:isNew?'Agendar':'Guardar',
-  onDelete:isNew?null:function(){if(!confirmTwice('dele'+e.id))return false;store.remove('events',e.id);UI.calSel=null;return true;},
-  onSubmit:function(v){if(!v.title||!v.date)return false;v.kind=kind;if(isNew)store.add('events',Object.assign(v,{actas:{}})).then(function(id){if(id)UI.calSel={ev:id,date:v.date};var d=parseISO(v.date);UI.calMonth=new Date(d.getFullYear(),d.getMonth(),1);render();});else store.update('events',e.id,v);return true;}});
+  onDelete:isNew?null:function(){if(!confirmTwice('dele'+e.id))return false;gcalDelete(e);store.remove('events',e.id);UI.calSel=null;return true;},
+  onSubmit:function(v){if(!v.title||!v.date)return false;v.kind=kind;if(isNew)store.add('events',Object.assign(v,{actas:{}})).then(function(id){if(id){UI.calSel={ev:id,date:v.date};gcalPush(id);}var d=parseISO(v.date);UI.calMonth=new Date(d.getFullYear(),d.getMonth(),1);render();});else Promise.resolve(store.update('events',e.id,v)).then(function(){gcalPush(e.id);});return true;}});
 }
 function noteForm(n){
   n=n||{};var isNew=!n.id;
@@ -1259,6 +1277,17 @@ function agentPrompt(ag,prodId){
   t+=' Cuando terminemos cada entrega, ofréceme guardarla en Scriptorium con guardar_entrega (agente: '+ag.id+(p?', producto: '+pLabel(p):'')+(UI.me?', autor: '+UI.me:'')+').';
   return t+'\n\nLo que necesito: ';
 }
+function jpost(path,data){return api(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data||{})});}
+function loadGcal(){return api('/api/gcal').then(function(r){Object.assign(GCAL,r,{loaded:true});scheduleRender();}).catch(function(){GCAL.loaded=true;});}
+// Envía a Google la reunión o fecha recién guardada y guarda el id de Google (y el Meet si lo creó).
+function gcalPush(id){if(!GCAL.connected)return;jpost('/api/gcal/push',{id:id}).then(function(r){if(r&&Object.keys(r).length)store.update('events',id,r);}).catch(function(e){toast('No se pudo enviar a Google Calendar. '+e.message);loadGcal();});}
+function gcalDelete(e){if(!GCAL.connected||!e||!e.gcal||!e.gcal.id)return;jpost('/api/gcal/delete',{gid:e.gcal.id,cal:e.gcal.cal}).catch(function(err){toast('No se pudo borrar en Google Calendar. '+err.message);});}
+var gcalPulled=0;
+function gcalPull(force){if(!GCAL.connected)return;if(!force&&Date.now()-gcalPulled<2*60*1000)return;gcalPulled=Date.now();jpost('/api/gcal/pull',force?{force:true}:{}).then(function(r){if(force)toast(r.skipped?'Ya estaba al día':'Listo: '+r.created+' nuevos, '+r.updated+' cambiados, '+r.removed+' quitados');loadGcal();}).catch(function(e){if(force)toast(e.message);loadGcal();});}
+function gcalPick(){api('/api/gcal/calendars').then(function(r){var cs=r.calendars||[];if(!cs.length){toast('Esa cuenta no tiene calendarios donde se pueda escribir.');return;}var cur=(cs.find(function(c){return c.selected;})||cs[0]).id;
+  form({title:'Calendario de Google',fields:[{name:'id',label:'Calendario del equipo',type:'select',value:cur,options:cs.map(function(c){return [c.id,c.name+(c.primary?' (principal)':'')];}),hint:'las reuniones se crean aquí'}],submit:'Usar este',
+    onSubmit:function(v){var c=cs.find(function(x){return x.id===v.id;});toast('Cambiando calendario…');jpost('/api/gcal/calendar',{id:v.id,name:c?c.name:v.id}).then(function(){toast('Listo. Calendario: '+(c?c.name:v.id));loadGcal();}).catch(function(e){toast(e.message);});return true;}});
+}).catch(function(e){toast(e.message);});}
 function loadMcp(){return api('/api/mcp').then(function(r){MCP.loaded=true;MCP.url=r.url||null;scheduleRender();}).catch(function(){MCP.loaded=true;});}
 
 /* ---------- events ---------- */
@@ -1315,8 +1344,12 @@ document.addEventListener('click',function(ev){
     case 'delgoal':if(!confirmTwice('delg'+id))return;delGoal(id);return;
     case 'gmodo':UI.gf={modo:el.dataset.t,mes:'',ini:'',fin:''};render();return;
     case 'newevent':eventForm(null,el.dataset.k);return;
+    case 'gconnect':api('/api/gcal/connect',{method:'POST'}).then(function(r){location.href=r.url;}).catch(function(e){toast(e.message);});return;
+    case 'gdisconnect':if(!confirmTwice('gdisc'))return;api('/api/gcal/disconnect',{method:'POST'}).then(function(){toast('Google Calendar desconectado');loadGcal();}).catch(function(e){toast(e.message);});return;
+    case 'gsync':toast('Revisando Google Calendar…');gcalPull(true);return;
+    case 'gcalpick':gcalPick();return;
     case 'editevent':eventForm(byId('events',id));return;
-    case 'editagenda':var e1=byId('events',id);form({title:'Agenda',fields:[{name:'agenda',label:'Puntos de la agenda',type:'textarea',hint:'uno por línea',rows:5,value:e1.agenda}],onSubmit:function(v){store.update('events',id,{agenda:v.agenda});return true;}});return;
+    case 'editagenda':var e1=byId('events',id);form({title:'Agenda',fields:[{name:'agenda',label:'Puntos de la agenda',type:'textarea',hint:'uno por línea',rows:5,value:e1.agenda}],onSubmit:function(v){Promise.resolve(store.update('events',id,{agenda:v.agenda})).then(function(){gcalPush(id);});return true;}});return;
     case 'calsel':UI.calSel={ev:el.dataset.ev,date:el.dataset.date};var dd=parseISO(el.dataset.date);UI.calMonth=new Date(dd.getFullYear(),dd.getMonth(),1);if(UI.view==='calendario')render();return;
     case 'calnav':var d=+el.dataset.d;var mo=UI.calMonth||new Date();UI.calMonth=d===0?new Date(today().getFullYear(),today().getMonth(),1):new Date(mo.getFullYear(),mo.getMonth()+d,1);render();return;
     case 'agent':UI.agent=id;UI.chatId=null;render();return;
@@ -1441,7 +1474,7 @@ var roasTimer=null,booted=false;
 function bootData(){
   hideGate();route();
   loadAll().then(function(){moveLegacyGoals();if(!booted){booted=true;subscribe();}}).catch(function(e){console.warn(e);showGate('error','No se pudieron leer los datos del equipo.');});
-  loadRoas();loadMcp();clearInterval(roasTimer);roasTimer=setInterval(loadRoas,10*60*1000);
+  loadRoas();loadMcp();loadGcal().then(function(){if(UI.view==='calendario')gcalPull();});clearInterval(roasTimer);roasTimer=setInterval(loadRoas,10*60*1000);
 }
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&ME&&ME.role!=='pendiente'&&Date.now()-lastLoad>5*60*1000){loadAll().catch(function(){});loadRoas();}});
 function onSession(session,force){
@@ -1452,6 +1485,8 @@ function onSession(session,force){
     .catch(function(e){if(e.status===401){sb.auth.signOut();return;}showGate('error','No se pudo verificar tu cuenta. '+e.message);});
 }
 function start(){
+  var gq=new URLSearchParams(location.search).get('gcal');
+  if(gq){history.replaceState(null,'',location.pathname+location.hash);setTimeout(function(){toast(gq==='ok'?'Google Calendar conectado. Elige el calendario del equipo si no es el principal.':gq==='denegado'?'No se dio permiso en Google.':'No se pudo conectar Google Calendar. Intenta de nuevo.');},1500);}
   showGate('loading');
   fetch('/api/config').then(function(r){return r.json();}).then(function(c){
     if(!c.supabaseUrl||!c.supabaseAnonKey)throw new Error('Falta configurar Supabase en Cloudflare.');

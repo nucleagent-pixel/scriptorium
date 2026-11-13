@@ -11,4 +11,9 @@ export interface Env {
   ROAS_START?: string;
   // Clave del conector MCP para Claude (larga y aleatoria).
   MCP_KEY?: string;
+  // Google Calendar (cliente OAuth "Aplicación web" del proyecto de Google Cloud).
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  // Zona horaria de las reuniones (por defecto America/Bogota).
+  GCAL_TZ?: string;
 }
