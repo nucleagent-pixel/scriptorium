@@ -1,0 +1,23 @@
+{
+  "name": "Scriptorium",
+  "short_name": "Scriptorium",
+  "description": "Operaciones del equipo NUCLEA",
+  "id": "/",
+  "start_url": "/#inicio",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#EDEEE9",
+  "theme_color": "#EDEEE9",
+  "lang": "es",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Tareas", "url": "/#tareas" },
+    { "name": "Equipo", "url": "/#equipo" },
+    { "name": "Calendario", "url": "/#calendario" }
+  ]
+}

@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#EDEEE9">
 <title>Scriptorium</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Scriptorium">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%229%22 fill=%22%23111%22/%3E%3Ctext x=%2216%22 y=%2222%22 font-family=%22Arial%22 font-weight=%22700%22 font-size=%2217%22 text-anchor=%22middle%22 fill=%22%23D6F35B%22%3ES%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,6 +44,10 @@ nav.rail{flex:0 0 88px;background:var(--card);border-radius:32px;padding:20px 0;
 .navi[aria-current="page"] .ic{background:var(--lime)}
 .navi:hover .ic{background:var(--soft)}
 .navi[aria-current="page"]:hover .ic{background:var(--lime)}
+.navi.inst{margin-top:auto;border:0;background:none;font-family:inherit;cursor:pointer}
+.navi.inst .ic{background:var(--lime)}
+.navi.inst:hover .ic{background:var(--ink);color:var(--lime)}
+.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:24px}
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;padding:8px 4px 0}
 .eyebrow{margin:0;font-size:14px;color:var(--muted)}
@@ -268,6 +276,7 @@ textarea.acta:focus{border-color:var(--ink)}
   .shell{flex-direction:column;padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
   nav.rail{position:fixed;top:auto;bottom:0;left:0;right:0;flex-direction:row;justify-content:space-around;border-radius:24px 24px 0 0;padding:8px max(8px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));z-index:40;box-shadow:0 -6px 24px rgba(17,17,17,.08);gap:0}
   .logo{display:none}
+  .navi.inst{display:none}
   .navi{font-size:10px}
   .navi .ic{width:40px;height:40px}
   h1{font-size:34px}
@@ -352,6 +361,7 @@ body.in-equipo .tcard{flex:1 1 auto;min-height:0}
 'use strict';
 /* ---------- icons ---------- */
 var I = {
+  download:'<path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5"/><path d="M4.5 15.5V18a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.5"/>',
   home:'<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
   box:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
   phone:'<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18h2"/>',
@@ -571,7 +581,25 @@ var VIEWS=[['inicio','Inicio','home'],['metas','Metas','target'],['productos','P
 function renderRail(){
   var h='<div class="logo" aria-hidden="true">S</div>';
   var unr=v0Unread();VIEWS.forEach(function(v){var b=v[0]==='equipo'&&unr?'<span class="nb" aria-label="'+unr+' sin leer">'+(unr>99?'99+':unr)+'</span>':'';h+='<a class="navi" href="#'+v[0]+'"'+(UI.view===v[0]?' aria-current="page"':'')+'><span class="ic">'+ic(v[2],22)+'</span>'+v[1]+b+'</a>';});
+  if(!isInstalled())h+='<button class="navi inst" data-a="install" title="Instalar Scriptorium en el escritorio"><span class="ic">'+ic('download',22)+'</span>Instalar</button>';
   document.getElementById('rail').innerHTML=h;
+}
+/* ---------- app de escritorio (PWA) ---------- */
+var installEvt=null;
+function isInstalled(){return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||(window.matchMedia&&matchMedia('(display-mode: window-controls-overlay)').matches)||navigator.standalone===true;}
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();installEvt=e;});
+window.addEventListener('appinstalled',function(){installEvt=null;toast('Listo: Scriptorium quedó instalado. Ábrelo desde el escritorio o el menú de apps.');renderRail();});
+if('serviceWorker' in navigator)window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});
+function installApp(){
+  if(installEvt){var e=installEvt;installEvt=null;e.prompt();e.userChoice.then(function(r){if(r.outcome!=='accepted')installEvt=e;});return;}
+  var ua=navigator.userAgent,safari=/Safari/.test(ua)&&!/Chrome|Chromium|Edg|OPR/.test(ua),ff=/Firefox/.test(ua),ios=/iPhone|iPad|iPod/.test(ua),android=/Android/.test(ua);
+  var st;
+  if(ios)st=['Toca el botón Compartir (el cuadrado con la flecha hacia arriba).','Elige «Agregar a pantalla de inicio».','Toca «Agregar». Scriptorium queda como una app más.'];
+  else if(safari)st=['En la barra de menú de arriba, abre «Archivo».','Elige «Agregar al Dock».','Pulsa «Agregar». Scriptorium queda en el Dock y en Aplicaciones.'];
+  else if(ff)st=['Firefox no instala apps web en el escritorio.','Abre esta misma dirección en Chrome o Edge: '+location.origin,'Ahí pulsa de nuevo «Instalar» en el menú de la izquierda.'];
+  else if(android)st=['Abre el menú del navegador (los tres puntos).','Elige «Instalar app» o «Agregar a pantalla principal».','Confirma. Scriptorium queda como una app más.'];
+  else st=['Busca el ícono de instalar al final de la barra de direcciones (una pantallita con una flecha).','Si no aparece, abre el menú del navegador (los tres puntos) y elige «Transmitir, guardar y compartir» → «Instalar página como app» en Chrome, o «Aplicaciones» → «Instalar este sitio como una aplicación» en Edge.','Confirma con «Instalar». Scriptorium se abre en su propia ventana y queda en el escritorio y en el menú de inicio.'];
+  openModal('<h2>Instalar Scriptorium</h2><p class="sub">Queda como una app en tu computador, con su propio ícono y ventana. Usa la misma cuenta y los mismos datos que la página.</p><ol class="steps">'+st.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ol><div class="mrow"><button class="btn" type="submit">Entendido</button></div>',function(){closeModal();});
 }
 function bellItems(){var t=today();return myTasks().filter(function(x){var d=parseISO(x.due);return d&&d<=t;}).sort(taskSort);}
 function headerTools(extra){
@@ -1273,6 +1301,7 @@ document.addEventListener('click',function(ev){
     case 'mdelete':if(UI.mdelete&&UI.mdelete()!==false)closeModal();return;
     case 'bell':UI.bell=!UI.bell;render();return;
     case 'whoami':whoForm();return;
+    case 'install':installApp();return;
     case 'searchgo':UI.search='';if(el.dataset.k==='task')UI.taskSel=id;if(el.dataset.k==='product'){setTimeout(function(){var p=byId('products',id);if(p)productForm(p);},50);}if(el.dataset.k==='line'){setTimeout(function(){var l=byId('lines',id);if(l)lineForm(l);},50);}if(el.dataset.k==='goal'){UI.gf={modo:'todo',mes:'',ini:'',fin:''};setTimeout(function(){var g=byId('goals',id);if(g)goalForm(g);},50);}return;
     case 'cleardemo':if(!confirmTwice('demo'))return;COLS.forEach(function(c){S[c].filter(function(x){return x.demo;}).forEach(function(x){store.remove(c,x.id);});});if(S.config&&S.config.demoGoals)store.setConfig({goals:[],demoGoals:false});toast('Datos de ejemplo borrados');return;
     case 'newproduct':productForm();return;
