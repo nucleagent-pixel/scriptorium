@@ -121,6 +121,39 @@ export const TOOLS = [
     },
   },
   {
+    name: "listar_actas",
+    description: "Actas de reunión del equipo, de la más nueva a la más vieja: número, fecha, asistentes, lo que se habló y las tareas acordadas con su estado. Úsalo para resumir reuniones o ver qué quedó pendiente.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        buscar: { type: "string", description: "Texto a buscar dentro de las actas (opcional)" },
+        limite: { type: "integer", minimum: 1, maximum: 30, default: 5 },
+      },
+    },
+  },
+  {
+    name: "crear_acta",
+    description: "Crea un acta de reunión en Scriptorium (por ejemplo a partir de las notas o la transcripción de una reunión) con sus tareas acordadas, que también aparecen en Tareas. Muestra el acta a la persona y pide confirmación antes de crearla.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fecha: { type: "string", description: "Fecha de la reunión YYYY-MM-DD (por defecto hoy)" },
+        asistentes: { type: "array", items: { type: "string" }, description: "Nombres de quienes asistieron (usa ver_equipo)" },
+        contenido: { type: "string", description: "Lo que se habló. Sugerido: ORDEN DEL DÍA, DESARROLLO DE LA REUNIÓN, DECISIONES y PROYECCIONES, cada punto con '- '" },
+        tareas: {
+          type: "array",
+          description: "Tareas acordadas",
+          items: {
+            type: "object",
+            properties: { titulo: { type: "string" }, persona: { type: "string" }, vence: { type: "string", description: "YYYY-MM-DD" } },
+            required: ["titulo"],
+          },
+        },
+      },
+      required: ["contenido"],
+    },
+  },
+  {
     name: "sincronizar_productos",
     description: "Trae las ofertas del NUCLEA Dashboard como productos de Scriptorium, uno por oferta y país (cada uno con su ROAS): crea los que faltan, enlaza productos con el mismo nombre y archiva los de ofertas archivadas. También corre sola cada hora.",
     inputSchema: { type: "object", properties: {} },
@@ -151,6 +184,12 @@ export function semaforo(roas: number | null): string {
 async function items(env: Env, col: string): Promise<Item[]> {
   const r = await db<Item[]>(env, `sc_items?col=eq.${col}&select=id,data,created_at&order=created_at.desc&limit=2000`);
   if (!r.ok || !r.data) throw new ToolError("No se pudieron leer los datos de Scriptorium");
+  return r.data;
+}
+
+async function actas(env: Env): Promise<Item[]> {
+  const r = await db<Item[]>(env, "sc_items?col=eq.notes&data->>kind=eq.acta&select=id,data,created_at&order=created_at.desc&limit=2000");
+  if (!r.ok || !r.data) throw new ToolError("No se pudieron leer las actas");
   return r.data;
 }
 
@@ -353,6 +392,49 @@ export async function callTool(env: Env, name: string, args: Json): Promise<unkn
       return { ok: true, id };
     }
 
+    case "listar_actas": {
+      const limite = Math.min(30, Math.max(1, Number(args.limite) || 5));
+      const [notes, tasks] = await Promise.all([actas(env), items(env, "tasks")]);
+      const q = str(args.buscar).toLowerCase();
+      const list = notes
+        .filter((a) => !q || JSON.stringify(a.data).toLowerCase().includes(q))
+        .sort((a, b) => str(b.data.fecha).localeCompare(str(a.data.fecha)) || (Number(b.data.numero) || 0) - (Number(a.data.numero) || 0));
+      return {
+        actas: list.slice(0, limite).map((a) => ({
+          id: a.id, numero: a.data.numero ?? null, fecha: a.data.fecha || null, asistentes: a.data.asistentes || [], contenido: a.data.contenido || "",
+          tareas_acordadas: [
+            ...tasks.filter((t) => t.data.acta === a.id).map((t) => ({ id: t.id, titulo: t.data.title, responsable: t.data.who || null, estado: t.data.status, vence: t.data.due || null })),
+            ...(Array.isArray(a.data.oldTareas) ? (a.data.oldTareas as Json[]) : []).filter((t) => !t.moved).map((t) => ({ titulo: t.t, responsable: t.who || null, estado: t.estado, vence: t.due || null, en: "Scriptorium viejo" })),
+          ],
+        })),
+      };
+    }
+
+    case "crear_acta": {
+      const contenido = String(args.contenido ?? "").trim();
+      if (!contenido) throw new ToolError("Falta el contenido del acta");
+      if (contenido.length > 100_000) throw new ToolError("El acta es demasiado larga (máximo 100.000 caracteres)");
+      const fecha = str(args.fecha) || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(new Date());
+      if (!DATE.test(fecha)) throw new ToolError("fecha debe ser YYYY-MM-DD");
+      const tareas = Array.isArray(args.tareas) ? (args.tareas as Json[]) : [];
+      for (const t of tareas) if (str(t.vence) && !DATE.test(str(t.vence))) throw new ToolError("vence de cada tarea debe ser YYYY-MM-DD");
+      const prev = await actas(env);
+      const numero = prev.reduce((m, a) => Math.max(m, Number(a.data.numero) || 0), 0) + 1;
+      const asistentes = Array.isArray(args.asistentes) ? (args.asistentes as unknown[]).map((x) => str(x, 60)).filter(Boolean) : [];
+      const now = new Date().toISOString();
+      const id = await insert(env, "notes", { kind: "acta", numero, fecha, asistentes, contenido, evento: "", source: "Claude", createdAt: now });
+      const creadas: string[] = [];
+      for (const t of tareas) {
+        const titulo = str(t.titulo, 200);
+        if (!titulo) continue;
+        creadas.push(await insert(env, "tasks", {
+          title: titulo, who: str(t.persona, 60), priority: "Media", due: str(t.vence), product: "", stage: "", goal: "",
+          notes: "", status: "Pendiente", comments: [], links: [], acta: id, createdAt: now,
+        }));
+      }
+      return { ok: true, id, numero, tareas_creadas: creadas.length };
+    }
+
     case "sincronizar_productos": {
       try { return await syncProducts(env); } catch (e) { throw new ToolError(e instanceof Error ? e.message : "No se pudo sincronizar"); }
     }
@@ -383,7 +465,7 @@ async function handleMessage(env: Env, msg: Json): Promise<Json | null> {
             "Scriptorium es la app de operaciones del equipo NUCLEA (productos digitales de bienestar que se venden por WhatsApp con anuncios de Meta). " +
             "Antes de trabajar en un producto, usa ver_producto para tener su contexto (línea, avatar, ROAS por país, entregas anteriores). " +
             "Cuando termines una entrega (oferta, guiones, script, copys, contenido del PDF, plan de edición), ofrece guardarla con guardar_entrega. " +
-            "Pide confirmación antes de crear o cambiar tareas. Todo en español.",
+            "Pide confirmación antes de crear o cambiar tareas o actas. Las actas de reunión se leen con listar_actas y se crean con crear_acta. Todo en español.",
         });
       case "ping":
         return rpcResult(id, {});

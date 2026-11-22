@@ -23,6 +23,7 @@ URL: `https://<tu-worker>/mcp/<MCP_KEY>`. Cualquier persona aprobada la puede co
 | `guardar_entrega` | Guarda lo que hizo un agente en el producto (con enlace opcional a Drive) |
 | `listar_entregas` | Entregas guardadas, con o sin el texto |
 | `listar_tareas`, `crear_tarea`, `actualizar_tarea` | Tareas del equipo |
+| `listar_actas`, `crear_acta` | Actas de reunión con sus tareas acordadas (por ejemplo, crear el acta desde la transcripción de una reunión) |
 | `registrar_hallazgo` | Anunciante modelable para Productos → Encontrados |
 | `ver_equipo` | Nombres del equipo para asignar tareas |
 

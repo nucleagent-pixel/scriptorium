@@ -24,7 +24,8 @@ beforeEach(() => {
     if (p === "sc_members") return Response.json([{ name: "Anyelita", role: "equipo" }, { name: "NUCLEA", role: "admin" }]);
     if (p === "sc_items" && method === "GET") {
       const col = u.searchParams.get("col")?.replace("eq.", ""); const id = u.searchParams.get("id")?.replace("eq.", "");
-      return Response.json(rows.filter((r) => (!col || r.col === col) && (!id || r.id === id)));
+      const kind = u.searchParams.get("data->>kind")?.replace("eq.", "");
+      return Response.json(rows.filter((r) => (!col || r.col === col) && (!id || r.id === id) && (!kind || r.data.kind === kind)));
     }
     if (p === "sc_items" && method === "POST") {
       const b = JSON.parse(String(init.body)); const r = { id: `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`, col: b.col, data: b.data, created_at: new Date().toISOString() };
@@ -99,5 +100,19 @@ describe("conector MCP", () => {
     expect(() => findProduct(ps, "reto")).toThrow(/varios/);
     expect(semaforo(1.43)).toBe("ámbar");
     expect(semaforo(null)).toBe("sin pauta");
+  });
+
+  it("crea un acta con sus tareas y la lista", async () => {
+    rows.push({ id: "00000000-0000-4000-8000-0000000000a1", col: "notes", data: { kind: "acta", numero: 4, fecha: "2026-11-01", contenido: "vieja" }, created_at: "2026-11-01T00:00:00Z" });
+    rows.push({ id: "00000000-0000-4000-8000-0000000000a2", col: "notes", data: { text: "post-it" }, created_at: "2026-11-01T00:00:00Z" });
+    const r = await call("crear_acta", { fecha: "2026-11-20", asistentes: ["NUCLEA"], contenido: "DECISIONES\n- Subir pauta", tareas: [{ titulo: "Subir pauta", persona: "Anyelita", vence: "2026-11-21" }] });
+    expect(r.body.result.structuredContent).toMatchObject({ ok: true, numero: 5, tareas_creadas: 1 });
+    const t = rows.find((x) => x.col === "tasks" && x.data.title === "Subir pauta")!;
+    expect(t.data.acta).toBe(r.body.result.structuredContent.id);
+    const l = await call("listar_actas");
+    const a = l.body.result.structuredContent.actas;
+    expect(a.map((x: any) => x.numero)).toEqual([5, 4]);
+    expect(a[0].tareas_acordadas[0]).toMatchObject({ titulo: "Subir pauta", responsable: "Anyelita", estado: "Pendiente" });
+    expect((await call("crear_acta", { contenido: "x", fecha: "20-11-2026" })).body.result.isError).toBe(true);
   });
 });
