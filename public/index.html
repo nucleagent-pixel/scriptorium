@@ -226,6 +226,21 @@ table.found td{vertical-align:middle}.facts{display:flex;gap:6px;align-items:cen
 .calaside{flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:24px}
 textarea.acta{width:100%;min-height:200px;border:1px solid var(--line);border-radius:18px;padding:14px 16px;resize:vertical;background:var(--soft);font-size:14px;line-height:1.5;outline:0}
 textarea.acta:focus{border-color:var(--ink)}
+textarea.acta.big{min-height:260px;font-size:15px;line-height:1.6;padding:16px 18px}
+.alist{flex:0 1 340px;min-width:260px;gap:12px;align-self:flex-start;position:sticky;top:24px;max-height:calc(100vh - 48px)}
+.alistin{display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:0;overscroll-behavior:contain}
+.asearch{width:100%;height:44px;border:1px solid var(--line);border-radius:14px;padding:0 14px;background:var(--soft);font:inherit;font-size:14px;outline:0}
+.asearch:focus{border-color:var(--ink)}
+.sitem{cursor:pointer;display:block;text-decoration:none}
+.sitem.on{background:var(--ink);color:var(--inkfg)}.sitem.on .sm{color:#CFCFC8}
+.sitem .ad{font-weight:500;color:var(--muted)}.sitem.on .ad{color:#CFCFC8}
+.adetail{flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:24px}
+.ameta{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.ameta .mini{min-width:84px}
+.atask{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.atask input,.atask select{height:40px;border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--soft);font:inherit;font-size:14px;outline:0}
+.atask input[name=title]{flex:1 1 220px;min-width:0}
+.atask input:focus,.atask select:focus{border-color:var(--ink)}
+@media (max-width:760px){.alist{position:static;max-height:none;flex-basis:100%}.alistin{max-height:40vh}}
 .saved{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
 .agents{flex:0 1 300px;min-width:240px;display:flex;flex-direction:column;gap:10px}
 .agent{display:flex;gap:12px;align-items:flex-start;text-align:left;background:var(--card);border-radius:22px;padding:16px;border:1.5px solid var(--card);width:100%;color:var(--fg)}
@@ -431,9 +446,10 @@ function countriesText(cs){return (cs||[]).map(function(c){return c.code+(c.roas
 /* ---------- data layer ---------- */
 var COLS=['products','found','lines','tasks','notes','events','chats','deliverables'];
 // Las metas viven en la colección notes con kind:'goal' (así no hay que cambiar la base de datos) y en la app se ven como S.goals.
-var VCOLS=COLS.concat(['goals']);
-function colOf(r){return r&&r.col==='notes'&&r.data&&r.data.kind==='goal'?'goals':r&&r.col;}
-var S={products:[],found:[],lines:[],tasks:[],notes:[],events:[],chats:[],deliverables:[],goals:[],members:[],config:null,loaded:{},live:true};
+// Las actas también viven en notes, con kind:'acta' → S.actas.
+var VCOLS=COLS.concat(['goals','actas']),KINDS={goal:'goals',acta:'actas'};
+function colOf(r){return r&&r.col==='notes'&&r.data&&KINDS[r.data.kind]||r&&r.col;}
+var S={products:[],found:[],lines:[],tasks:[],notes:[],events:[],chats:[],deliverables:[],goals:[],actas:[],members:[],config:null,loaded:{},live:true};
 var sb=null, SESSION=null, ME=null, channel=null, lastLoad=0;
 var ROAS={loaded:false,offers:[],rows:[],from:'',to:'',updatedAt:'',error:''};
 var UI={view:'inicio',ptab:'activos',taskSel:null,taskScope:'mine',prio:'todas',showDone:false,showBlocked:false,
@@ -447,7 +463,7 @@ function dropLocal(id){VCOLS.forEach(function(c){S[c]=S[c].filter(function(x){re
 function chk(r){if(r&&r.error)throw r.error;return r;}
 var store={
   add:function(col,data){data.createdAt=data.createdAt||new Date().toISOString();
-    var real=col;if(col==='goals'){real='notes';data.kind='goal';}
+    var real=col;if(col==='goals'){real='notes';data.kind='goal';}if(col==='actas'){real='notes';data.kind='acta';}
     return sb.from('sc_items').insert({col:real,data:data}).select('id,col,data,created_at').single().then(chk).then(function(r){upsertLocal(r.data);scheduleRender();return r.data.id;}).catch(fail);},
   update:function(col,id,data){
     var it=byId(col,id);if(it)Object.assign(it,data);scheduleRender();
@@ -501,7 +517,7 @@ function sortNum(a,b){return String(a.num).localeCompare(String(b.num),undefined
 function myTasks(){var me=UI.me;return S.tasks.filter(function(t){return (!me||t.who===me)&&(t.status==='Pendiente'||t.status==='En curso');});}
 var PR={Alta:0,Media:1,Baja:2};
 function taskSort(a,b){var da=a.due||'9999',dbb=b.due||'9999';if(da!==dbb)return da<dbb?-1:1;return (PR[a.priority]||1)-(PR[b.priority]||1);}
-function taskMeta(t){var bits=[];if(t.priority)bits.push(t.priority);if(t.due)bits.push(shortDate(t.due));var pn=productName(t.product);if(pn)bits.push(pn);if(!UI.me||UI.taskScope==='team')if(t.who&&UI.view!=='inicio')bits.push(t.who);return bits.join(' · ');}
+function taskMeta(t){var bits=[];if(t.priority)bits.push(t.priority);if(t.due)bits.push(shortDate(t.due));var pn=productName(t.product);if(pn)bits.push(pn);if(!UI.me||UI.taskScope==='team'||UI.view==='actas')if(t.who&&UI.view!=='inicio')bits.push(t.who);return bits.join(' · ');}
 function isOverdue(t){var d=parseISO(t.due);return d&&d<today()&&t.status!=='Hecha'&&t.status!=='Descartada';}
 
 /* occurrences of events in [from,to] */
@@ -577,7 +593,7 @@ function onTeamInsert(doc){
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){document.title=document.title.replace(/^\(\d+\) /,'');if(UI.view==='equipo')scheduleRender();}});
 
 /* ---------- nav & header ---------- */
-var VIEWS=[['inicio','Inicio','home'],['metas','Metas','target'],['productos','Productos','box'],['lineas','Líneas','phone'],['tareas','Tareas','check'],['calendario','Calendario','cal'],['equipo','Equipo','chat'],['agentes','Agentes','spark']];
+var VIEWS=[['inicio','Inicio','home'],['metas','Metas','target'],['productos','Productos','box'],['lineas','Líneas','phone'],['tareas','Tareas','check'],['calendario','Calendario','cal'],['actas','Actas','doc'],['equipo','Equipo','chat'],['agentes','Agentes','spark']];
 function renderRail(){
   var h='<div class="logo" aria-hidden="true">S</div>';
   var unr=v0Unread();VIEWS.forEach(function(v){var b=v[0]==='equipo'&&unr?'<span class="nb" aria-label="'+unr+' sin leer">'+(unr>99?'99+':unr)+'</span>':'';h+='<a class="navi" href="#'+v[0]+'"'+(UI.view===v[0]?' aria-current="page"':'')+'><span class="ic">'+ic(v[2],22)+'</span>'+v[1]+b+'</a>';});
@@ -623,6 +639,7 @@ function searchResults(){
   S.lines.forEach(function(l){if(('línea '+l.num+' linea '+l.num+' '+(l.phone||'')).toLowerCase().indexOf(q)>=0)r.push({h:'#lineas',id:l.id,k:'line',t:'Línea '+l.num,s:lineState(l).status});});
   S.tasks.forEach(function(t){if(String(t.title).toLowerCase().indexOf(q)>=0)r.push({h:'#tareas',id:t.id,k:'task',t:t.title,s:'Tarea · '+t.status});});
   S.goals.forEach(function(g){if(String(g.titulo).toLowerCase().indexOf(q)>=0)r.push({h:'#metas',id:g.id,k:'goal',t:g.titulo,s:'Meta · '+goalProgress(g).txt});});
+  S.actas.forEach(function(a){if(actaMatches(a,q))r.push({h:'#actas',id:a.id,k:'acta',t:actaNum(a)+' · '+aDate(a.fecha),s:'Acta · '+actaSnippet(a)});});
   var h='<div class="results" role="listbox">';
   if(!r.length)h+='<div class="sub" style="padding:10px 12px">Sin resultados para “'+esc(UI.search)+'”.</div>';
   r.slice(0,12).forEach(function(x){h+='<a href="'+x.h+'" data-a="searchgo" data-k="'+x.k+'" data-id="'+x.id+'">'+esc(x.t)+'<small>'+esc(x.s)+'</small></a>';});
@@ -812,6 +829,147 @@ function moveLegacyGoals(){
   old.forEach(function(x){if(!x||!x.label)return;store.add('goals',{titulo:x.label,periodo:'mensual',inicio:r[0],fin:iso(new Date(today().getFullYear(),today().getMonth()+1,0)),tipo:'manual',objetivo:Number(x.total)||1,logrado:Number(x.done)||0,responsables:['equipo'],descripcion:'',completada:false});});
 }
 
+/* ---------- actas (como "Actas" del Scriptorium viejo, mejoradas) ---------- */
+// Viven en la colección notes con kind:'acta' (sin cambiar la base de datos) → S.actas.
+// Campos: numero, fecha, asistentes [nombres], contenido (texto libre), evento (id de la reunión del Calendario), oldId, oldTareas, source.
+// Las tareas acordadas son tareas normales con task.acta = id del acta; salen también en Tareas.
+var ACTA_SECS=['DESARROLLO DE LA REUNIÓN','DECISIONES','PROYECCIONES'];
+function actaGuide(ev){
+  var ag=ev?String(ev.agenda||'').split('\n').map(function(x){return x.trim();}).filter(Boolean):[];
+  return 'ORDEN DEL DÍA\n'+(ag.length?ag.map(function(x){return '- '+x;}).join('\n'):'- ')+'\n\n'+ACTA_SECS.map(function(s){return s+'\n- ';}).join('\n\n');
+}
+function actaNum(a){return 'Acta '+pad(Number(a&&a.numero)||0);}
+function aDate(s){var d=s&&parseISO(s);return d?d.getDate()+' '+MES[d.getMonth()]+' '+d.getFullYear():'Sin fecha';}
+function nextActaNum(){return S.actas.reduce(function(m,a){return Math.max(m,Number(a.numero)||0);},0)+1;}
+function actasSorted(){return S.actas.slice().sort(function(a,b){return String(b.fecha||'').localeCompare(String(a.fecha||''))||(Number(b.numero)||0)-(Number(a.numero)||0);});}
+function actaTasks(id){return S.tasks.filter(function(t){return t.acta===id;}).sort(taskSort);}
+function actaFor(evId,date){return S.actas.find(function(a){return a.evento===evId&&a.fecha===date;});}
+function actaOldOpen(a){return (a.oldTareas||[]).filter(function(x){return !x.moved;});}
+function actaSnippet(a){var ls=String(a.contenido||'').split('\n').map(function(x){return x.replace(/^[-•*]\s*/,'').replace(/^✅\s*/,'').trim();}).filter(function(x){return x&&/[a-záéíóúñ]/.test(x);});return ls[0]?ls[0].slice(0,90):'Sin contenido todavía';}
+function actaMatches(a,q){if(!q)return true;q=q.toLowerCase();
+  return [actaNum(a),a.fecha,aDate(a.fecha),a.contenido,(a.asistentes||[]).join(' ')].concat(actaTasks(a.id).map(function(t){return t.title;})).concat((a.oldTareas||[]).map(function(t){return t.t;})).join(' ').toLowerCase().indexOf(q)>=0;}
+function actaText(a){
+  var ts=actaTasks(a.id),old=actaOldOpen(a);
+  var t=actaNum(a)+' · '+aDate(a.fecha)+'\n'+((a.asistentes||[]).length?'Asistentes: '+a.asistentes.join(', ')+'\n':'')+'\n'+String(a.contenido||'').trim()+'\n';
+  if(ts.length||old.length)t+='\nTAREAS ACORDADAS\n'+ts.map(function(x){return '- '+x.title+' ('+[x.who||'Sin responsable',x.due?shortDate(x.due):'',x.status].filter(Boolean).join(' · ')+')';}).concat(old.map(function(x){return '- '+x.t+' ('+[x.who||'Sin responsable',x.estado].join(' · ')+')';})).join('\n')+'\n';
+  return t;
+}
+function vActas(){
+  var all=actasSorted(),q=String(UI.actaQ||'').trim(),list=all.filter(function(a){return actaMatches(a,q);});
+  var sel=UI.actaSel&&byId('actas',UI.actaSel);if(!sel)sel=list[0]||all[0]||null;
+  var adm=ME&&ME.role==='admin';
+  var h=top('Lo que acordamos en cada reunión','Actas',(adm?'<button class="btn ghost" style="height:48px" data-a="oldimport" data-w="actas">Traer del Scriptorium viejo</button>':'')+'<button class="btn" data-a="newacta">'+ic('plus',18)+'Nueva acta</button>');
+  h+=banners();
+  h+='<div class="row"><section class="card alist"><div class="cardhead" style="align-items:center"><h2>Todas <span class="count">'+all.length+'</span></h2></div>';
+  h+='<label class="sr" for="actaq">Buscar en las actas</label><input id="actaq" class="asearch" type="search" placeholder="Buscar en las actas" value="'+esc(UI.actaQ||'')+'" autocomplete="off">';
+  if(!all.length)h+='<div class="empty">Todavía no hay actas. Crea la de la próxima reunión con “Nueva acta”'+(adm?' o trae las del Scriptorium viejo':'')+'.</div>';
+  else if(!list.length)h+='<div class="empty">Ninguna acta tiene “'+esc(q)+'”.</div>';
+  h+='<div class="alistin">'+list.map(function(a){var n=actaTasks(a.id).length+actaOldOpen(a).length,on=!!(sel&&sel.id===a.id),na=(a.asistentes||[]).length;
+    return '<button class="sitem'+(on?' on':'')+'" data-a="actasel" data-id="'+a.id+'" aria-pressed="'+on+'"><div class="st">'+esc(actaNum(a))+' <span class="ad">· '+esc(aDate(a.fecha))+'</span></div><div class="sm">'+esc(actaSnippet(a))+'</div><div class="sm">'+n+' tarea'+(n===1?'':'s')+' · '+na+' asistente'+(na===1?'':'s')+'</div></button>';}).join('')+'</div></section>';
+  h+='<div class="adetail">'+(sel?actaDetail(sel):'<section class="card pad24"><div class="empty">Cuando haya actas, aquí ves la que elijas.</div></section>')+'</div></div>';
+  h+='<p class="foot">El acta se guarda sola mientras escribes. Las tareas acordadas también aparecen en Tareas.</p>';
+  return h;
+}
+function actaDetail(a){
+  var ev=a.evento&&byId('events',a.evento),ts=actaTasks(a.id),old=a.oldTareas||[],m=cfg().members;
+  var h='<section class="card pad24" style="gap:16px"><div class="cardhead" style="align-items:flex-start"><div><p class="mini">'+esc(a.fecha?longDate(parseISO(a.fecha))+' de '+parseISO(a.fecha).getFullYear():'Sin fecha')+'</p><h2 style="font-size:28px">'+esc(actaNum(a))+'</h2></div>';
+  h+='<div style="display:flex;gap:6px"><button class="iconbtn sm" data-a="actacopy" data-id="'+a.id+'" aria-label="Copiar el acta" title="Copiar el acta">'+ic('doc',16)+'</button><button class="iconbtn sm" data-a="editacta" data-id="'+a.id+'" aria-label="Editar número, fecha y asistentes" title="Editar número, fecha y asistentes">'+ic('edit',16)+'</button></div></div>';
+  var as=a.asistentes||[];
+  h+='<div class="ameta"><span class="mini">Asistentes</span>'+(as.length?'<div class="chips">'+as.map(function(n){return '<span class="chip n" style="padding-left:4px"><span class="who" style="width:24px;height:24px;font-size:10px">'+esc(initials(n))+'</span>'+esc(n)+'</span>';}).join('')+'</div>':'<span class="sub" style="margin:0">Sin registrar</span>')+'</div>';
+  if(ev)h+='<div class="ameta"><span class="mini">Reunión</span><a class="link" href="#calendario" data-a="calsel" data-ev="'+ev.id+'" data-date="'+esc(a.fecha||'')+'">'+ic('cal',14)+esc(ev.title)+'</a></div>';
+  if(a.source==='Scriptorium viejo')h+='<div class="ameta"><span class="mini">Origen</span><span class="sub" style="margin:0">Traída del Scriptorium viejo</span></div>';
+  h+='<div class="grp"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><label class="mini" for="actaTxt">Lo que se habló</label><span style="display:flex;gap:12px;align-items:center"><button class="link" data-a="actaguide" data-id="'+a.id+'">Insertar guía de temas</button><span class="saved" id="actaState">'+ic('tick',14)+'Guardado</span></span></div>';
+  h+='<textarea id="actaTxt" class="acta big" rows="'+Math.max(12,String(a.contenido||'').split('\n').length+3)+'" data-id="'+a.id+'" placeholder="Escribe aquí todo lo de la reunión, como quieras. Se guarda solo.">'+esc(a.contenido||'')+'</textarea></div>';
+  h+='</section>';
+  // tareas acordadas
+  h+='<section class="card pad24" style="gap:12px"><div class="cardhead" style="align-items:center"><h2 style="font-size:20px">Tareas acordadas <span class="count">'+(ts.length+actaOldOpen(a).length)+'</span></h2></div>';
+  if(!ts.length&&!old.length)h+='<div class="empty" style="padding:12px">Todavía no hay tareas. Escribe abajo cada compromiso y a quién le toca.</div>';
+  ts.forEach(function(t){h+=taskRow(t);});
+  old.forEach(function(o,i){if(o.moved)return;
+    h+='<div class="task"><span class="check'+(o.estado==='Hecha'?' on':'')+'" aria-hidden="true">'+(o.estado==='Hecha'?ic('tick',14):'')+'</span><div style="min-width:0;flex:1"><div class="tt" style="'+(o.estado==='Hecha'?'color:var(--muted)':'')+'">'+esc(o.t)+'</div><div class="tm">'+esc([o.who||'Sin responsable',o.estado,'del Scriptorium viejo'].join(' · '))+'</div></div>'+(o.estado!=='Hecha'?'<button class="btn ghost sm" data-a="actaold" data-id="'+a.id+'" data-i="'+i+'">Pasar a Tareas</button>':'')+'</div>';});
+  h+='<form class="atask" data-f="actatask" data-id="'+a.id+'"><label class="sr" for="atask_t">Nueva tarea acordada</label><input id="atask_t" name="title" placeholder="Nueva tarea acordada" autocomplete="off">';
+  h+='<label class="sr" for="atask_w">Responsable</label><select id="atask_w" name="who"><option value="">Sin responsable</option>'+m.map(function(x){return '<option>'+esc(x)+'</option>';}).join('')+'</select>';
+  h+='<label class="sr" for="atask_d">Fecha límite</label><input id="atask_d" name="due" type="date">';
+  h+='<button class="btn dark sm" type="submit">'+ic('plus',14)+'Agregar</button></form></section>';
+  // seguimiento: lo que sigue abierto de actas anteriores
+  var prev=S.tasks.filter(function(t){if(!t.acta||t.acta===a.id||(t.status!=='Pendiente'&&t.status!=='En curso'))return false;var pa=byId('actas',t.acta);return pa&&String(pa.fecha||'')<=String(a.fecha||'');}).sort(taskSort);
+  if(prev.length){h+='<section class="card pad24" style="gap:10px"><div class="cardhead" style="align-items:center"><div><h2 style="font-size:20px">Pendientes de actas anteriores <span class="count">'+prev.length+'</span></h2><p class="sub">Para revisarlas en esta reunión.</p></div></div>';
+    prev.forEach(function(t){var pa=byId('actas',t.acta);h+=taskRow(t).replace('</div></div>','</div><div class="tm">'+esc(actaNum(pa)+' · '+aDate(pa.fecha))+'</div></div>');});h+='</section>';}
+  return h;
+}
+function actaForm(a,preset){
+  a=a||{};preset=preset||{};var isNew=!a.id,members=cfg().members;
+  var asis=isNew?(preset.asistentes||members.slice()):(a.asistentes||[]);
+  var opts=members.map(function(x){return [x,x];});asis.forEach(function(n){if(members.indexOf(n)<0)opts.push([n,n]);});
+  var evs=S.events.filter(function(e){return e.kind==='reunion'||e.id===a.evento;}).sort(function(x,y){return String(x.title).localeCompare(String(y.title));});
+  var fields=[{name:'numero',label:'Número',type:'number',value:a.numero||nextActaNum()},{name:'fecha',label:'Fecha',type:'date',value:a.fecha||preset.fecha||iso(today())},
+    {name:'asistentes',label:'Asistentes',type:'checks',value:asis,options:opts},
+    {name:'evento',label:'Reunión del calendario',type:'select',value:a.evento||preset.evento||'',options:[['','Ninguna']].concat(evs.map(function(e){return [e.id,e.title];})),hint:'su agenda pasa al orden del día'}];
+  if(isNew)fields.push({name:'guia',label:'Cómo empezar',type:'checks',value:['1'],options:[['1','Con la guía de temas: orden del día, desarrollo, decisiones y proyecciones']]});
+  form({title:isNew?'Nueva acta':'Editar '+actaNum(a),fields:fields,submit:isNew?'Crear acta':'Guardar',
+    onDelete:isNew?null:function(){if(!confirmTwice('dela'+a.id))return false;delActa(a.id);return true;},deleteLabel:'Borrar acta',
+    onSubmit:function(v){var d={numero:parseInt(v.numero,10)||nextActaNum(),fecha:v.fecha||iso(today()),asistentes:v.asistentes||[],evento:v.evento||''};
+      if(isNew){d.contenido=(v.guia||[]).length?actaGuide(d.evento&&byId('events',d.evento)):'';createActa(d);}
+      else store.update('actas',a.id,d).then(function(){toast('Guardado');});
+      return true;}});
+}
+function createActa(d){
+  return store.add('actas',d).then(function(id){if(!id)return;UI.actaSel=id;UI.actaQ='';toast(actaNum(d)+' creada');
+    if(UI.view!=='actas')location.hash='actas';else render();
+    setTimeout(function(){var t=document.getElementById('actaTxt');if(t){t.focus();var k='DESARROLLO DE LA REUNIÓN\n- ',i=t.value.indexOf(k);if(i>=0)t.setSelectionRange(i+k.length,i+k.length);}},120);return id;});
+}
+function actaFromMeeting(evId,date){
+  var ev=byId('events',evId);if(!ev)return;var ex=actaFor(evId,date);
+  if(ex){UI.actaSel=ex.id;location.hash='actas';return;}
+  var ms=cfg().members,g=(ev.guests||[]).filter(function(x){return ms.indexOf(x)>=0;});
+  createActa({numero:nextActaNum(),fecha:date,asistentes:g.length?g:ms.slice(),evento:evId,contenido:actaGuide(ev)});
+}
+function delActa(id){actaTasks(id).forEach(function(t){store.update('tasks',t.id,{acta:''});});store.remove('actas',id);if(UI.actaSel===id)UI.actaSel=null;toast('Acta borrada');}
+function actaOldToTask(id,i){
+  var a=byId('actas',id),o=a&&(a.oldTareas||[])[i];if(!o||o.moved)return;
+  var ms=cfg().members,who=ms.indexOf(o.who)>=0?o.who:'',pr=cap(String(o.prioridad||'media').toLowerCase());if(['Alta','Media','Baja'].indexOf(pr)<0)pr='Media';
+  var notes=[o.notas||'',o.who&&!who?'Responsable en el Scriptorium viejo: '+o.who:''].filter(Boolean).join('\n');
+  store.add('tasks',{title:o.t,who:who,priority:pr,due:o.due||'',product:'',stage:'',goal:'',notes:notes,status:o.estado==='En curso'?'En curso':'Pendiente',comments:[],links:[],acta:id}).then(function(tid){
+    if(!tid)return;var ot=(a.oldTareas||[]).map(function(x,j){return j===i?Object.assign({},x,{moved:true}):x;});store.update('actas',id,{oldTareas:ot});toast('Tarea creada en Tareas');});
+}
+// Las actas que se escribían dentro de cada reunión del Calendario pasan una sola vez a la sección Actas.
+function moveLegacyActas(){
+  if(!ME||ME.role!=='admin'||(S.config&&S.config.actasMoved))return;
+  var todo=[];S.events.forEach(function(e){Object.keys(e.actas||{}).forEach(function(k){var t=String(e.actas[k]||'').trim();if(t&&!actaFor(e.id,k))todo.push({e:e,k:k,t:t});});});
+  store.setConfig({actasMoved:true});if(!todo.length)return;
+  todo.sort(function(x,y){return x.k.localeCompare(y.k);});var n=nextActaNum(),ms=cfg().members;
+  todo.forEach(function(x){var d={numero:n++,fecha:x.k,asistentes:(x.e.guests||[]).filter(function(g){return ms.indexOf(g)>=0;}),evento:x.e.id,contenido:x.t,source:'Calendario'};if(x.e.demo)d.demo=true;store.add('actas',d);});
+}
+// Actas del viejo (sc_actas). Asistentes: uid → nombre (+ nombres sin cuenta). Tareas acordadas (sc_tareas.actaId) se guardan dentro del acta.
+var OLD_EST={pendiente:'Pendiente',ejecucion:'En curso',completada:'Hecha'};
+function oldActaText(a){
+  if(a.contenido!=null&&String(a.contenido).trim()!=='')return String(a.contenido);
+  var sec=function(t,arr,check){arr=(arr||[]).filter(function(x){return x&&x.t;});return arr.length?t+'\n'+arr.map(function(x){return '- '+(check&&x.ok?'✅ ':'')+x.t;}).join('\n')+'\n':'';};
+  return [sec('ORDEN DEL DÍA',a.orden),sec('DESARROLLO DE LA REUNIÓN',a.desarrollo,true),sec('DECISIONES',a.decisiones),sec('PROYECCIONES',a.proyecciones)].filter(Boolean).join('\n').trim();
+}
+function oldActas(tok,soft){
+  return Promise.all([fsList(tok,'sc_actas'),soft('sc_usuarios'),soft('sc_tareas')]).then(function(res){
+    var src=res[0],users={},tasks=res[2],have={};
+    res[1].forEach(function(u){users[u.id]=u.nombre||u.email||'';});
+    S.actas.forEach(function(a){if(a.oldId)have[a.oldId]=1;});
+    var n=nextActaNum();
+    var todo=src.filter(function(a){return !have[a.id];}).map(function(a){
+      var asis=(a.asistentes||[]).map(function(u){return users[u]||'';}).concat(a.legacyAsist||[]).filter(Boolean);
+      var ot=tasks.filter(function(t){return t.actaId===a.id;}).map(function(t){
+        var w=t.responsable==='equipo'?'Todo el equipo':(users[t.responsable]||t.legacyResp||'');
+        return {t:t.titulo||'Sin título',who:w,estado:OLD_EST[t.estado]||'Pendiente',due:String(t.fecha||'').slice(0,10),prioridad:t.prioridad||'',notas:t.notas||''};});
+      return {oldId:a.id,numero:Number(a.numero)||n++,fecha:String(a.fecha||'').slice(0,10),asistentes:asis,contenido:oldActaText(a),evento:'',oldTareas:ot,source:'Scriptorium viejo'};});
+    if(!todo.length){toast(src.length?'No había nada nuevo para traer':'El Scriptorium viejo no tiene actas');return;}
+    // Si un número del viejo ya lo usa un acta hecha aquí, las de aquí pasan a seguir después de las del viejo (en orden de fecha).
+    var oldNums={};todo.forEach(function(d){oldNums[d.numero]=1;});S.actas.forEach(function(a){if(a.oldId)oldNums[a.numero]=1;});
+    var mine=S.actas.filter(function(a){return !a.oldId;}),clash=mine.some(function(a){return oldNums[a.numero];});
+    if(clash){var mx=Object.keys(oldNums).reduce(function(m,k){return Math.max(m,Number(k)||0);},0);
+      mine.sort(function(x,y){return String(x.fecha).localeCompare(String(y.fecha))||(x.numero||0)-(y.numero||0);}).forEach(function(a){store.update('actas',a.id,{numero:++mx});});}
+    return Promise.all(todo.map(function(d){return store.add('actas',d);})).then(function(){
+      toast('Listo: '+todo.length+' acta'+(todo.length===1?'':'s')+' del Scriptorium viejo'+(clash?'. Las actas hechas aquí siguen en la numeración después de las del viejo.':''));UI.actaSel=null;UI.actaQ='';render();});
+  });
+}
+
 function vProductos(){
   var act=activeProducts(),found=S.found.filter(function(f){return !f.converted;}),off=S.products.filter(function(p){return p.status==='apagado'||p.status==='archivado';});
   var tabs='<div class="tabs" role="tablist" aria-label="Vista">'+[['activos','Activos '+act.length],['encontrados','Encontrados '+found.length],['apagados','Apagados y archivados '+off.length]].map(function(t){return '<button role="tab" aria-selected="'+(UI.ptab===t[0])+'" data-a="ptab" data-t="'+t[0]+'">'+t[1]+'</button>';}).join('')+'</div>';
@@ -873,6 +1031,7 @@ function fsList(tok,col){var out=[];function page(pt){return fetch('https://fire
   .then(function(j){(j.documents||[]).forEach(function(d){var o=fsVal({mapValue:{fields:d.fields||{}}});o.id=d.name.split('/').pop();out.push(o);});return j.nextPageToken?page(j.nextPageToken):out;});}return page('');}
 var OLD_WHAT={found:{title:'productos encontrados',intro:'Se traen todos los productos encontrados con su calificación, estado, nicho, anuncios, enlaces, descripción y notas.'},
   lines:{title:'líneas',intro:'Se traen todas las líneas en cualquier estado menos Vendiendo, con su número, celular, operador, quién la maneja, días de calentamiento y notas.'},
+  actas:{title:'actas',intro:'Se traen todas las actas con su número, fecha, asistentes y todo lo escrito. Las tareas que se acordaron en cada una quedan dentro del acta, y las que sigan pendientes las puedes pasar a Tareas.'},
   goals:{title:'metas',intro:'Se traen todas las metas con su periodo, fechas, responsable, cómo se mide, número objetivo, descripción y si ya estaba cumplida. En las metas por tareas se guarda cuántas tareas se completaron allá.'}};
 function oldImportForm(what){what=what||'found';
   form({title:'Traer '+OLD_WHAT[what].title+' del Scriptorium viejo',intro:'Entra con tu correo y clave del Scriptorium viejo. '+OLD_WHAT[what].intro+' Lo que ya se trajo no se duplica. La clave no se guarda.',
@@ -891,6 +1050,7 @@ function oldImport(email,pass,what){
   .then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(/INVALID|PASSWORD|EMAIL/.test(j.error&&j.error.message||'')?'Correo o clave incorrectos':'No se pudo entrar al Scriptorium viejo');return j.idToken;});})
   .then(function(tok){var soft=function(c){return fsList(tok,c).catch(function(){return [];});};
     if(what==='goals')return oldGoals(tok,soft).then(function(){return null;});
+    if(what==='actas')return oldActas(tok,soft).then(function(){return null;});
     return Promise.all([what==='lines'?fsList(tok,'sc_lineas'):fsList(tok,'sc_encontrados'),soft('sc_productos'),soft('sc_usuarios'),what==='lines'?soft('sc_tareas'):Promise.resolve([])]);})
   .then(function(res){if(!res)return;var src=res[0],prods=res[1],users={},tasks=res[3];res[2].forEach(function(u){users[u.id]=u.nombre||u.email||'';});
     var col=what==='lines'?'lines':'found',have={};S[col].forEach(function(x){if(x.oldId)have[x.oldId]=1;});
@@ -1013,6 +1173,7 @@ function taskDetail(t){
   h+='<label>Etapa del producto<select data-c="tfield" data-f="stage" data-id="'+t.id+'"><option value="">Ninguna</option>'+STAGES.map(function(s){return '<option value="'+s[0]+'"'+(t.stage===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('')+'</select></label>';
   h+='<label>Meta<select data-c="tfield" data-f="goal" data-id="'+t.id+'">'+goalOptions(t.goal).map(function(o){return '<option value="'+esc(o[0])+'"'+((t.goal||'')===o[0]?' selected':'')+'>'+esc(o[1])+'</option>';}).join('')+'</select></label>';
   h+='</div>';
+  var ta=t.acta&&byId('actas',t.acta);if(ta)h+='<a class="link" href="#actas" data-a="actasel" data-id="'+ta.id+'">'+ic('doc',14)+'Acordada en el '+esc(actaNum(ta))+' · '+esc(aDate(ta.fecha))+'</a>';
   if(t.notes)h+='<div class="comment">'+esc(t.notes)+'</div>';
   h+='<div class="grp"><div class="mini">Archivos y enlaces</div>';
   (t.links||[]).forEach(function(l,i){h+='<div style="display:flex;gap:6px;align-items:center"><a class="fl" style="flex:1" href="'+esc(safeUrl(l.url))+'" target="_blank" rel="noopener">'+ic('link',16)+esc(l.label||l.url)+'</a><button class="iconbtn sm" data-a="dellink" data-id="'+t.id+'" data-i="'+i+'" aria-label="Quitar enlace">'+ic('x',14)+'</button></div>';});
@@ -1054,11 +1215,14 @@ function vCalendario(){
       h+='<section class="card pad24" style="gap:12px"><div class="cardhead" style="align-items:center"><h2 style="font-size:20px">Agenda</h2><button class="iconbtn sm" data-a="editagenda" data-id="'+ev.id+'" aria-label="Editar agenda">'+ic('edit',16)+'</button></div>';
       h+=ag.length?'<ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:14px">'+ag.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ol>':'<div class="empty">Sin agenda todavía.</div>';
       h+='</section>';
-      var acta=(ev.actas||{})[sel.date]||'';
-      h+='<section class="card pad24" style="gap:12px"><div class="cardhead" style="align-items:center"><h2 style="font-size:20px">Acta del '+d0.getDate()+' de '+MES[d0.getMonth()]+'</h2><span class="saved" id="actaState">'+ic('tick',14)+'Guardado</span></div><label class="sr" for="acta">Acta de la reunión</label><textarea id="acta" class="acta" data-ev="'+ev.id+'" data-date="'+sel.date+'" placeholder="Escribe aquí durante la reunión. Se guarda solo.">'+esc(acta)+'</textarea></section>';
+      var la=actaFor(ev.id,sel.date);
+      h+='<section class="card pad24" style="gap:12px"><div class="cardhead" style="align-items:center"><h2 style="font-size:20px">Acta del '+d0.getDate()+' de '+MES[d0.getMonth()]+'</h2>'+(la?'<span class="chip n">'+esc(actaNum(la))+'</span>':'')+'</div>';
+      if(la){var nt=actaTasks(la.id).length;h+='<p class="sub" style="margin:0">'+esc(actaSnippet(la))+'</p><p class="sub" style="margin:0">'+nt+' tarea'+(nt===1?'':'s')+' acordada'+(nt===1?'':'s')+'</p><a class="btn dark" style="align-self:flex-start" href="#actas" data-a="actasel" data-id="'+la.id+'">'+ic('doc',16)+'Abrir el acta</a>';}
+      else h+='<p class="sub" style="margin:0">Todavía no hay acta de esta reunión. Al crearla, la agenda pasa al orden del día y los invitados quedan como asistentes.</p><button class="btn dark" style="align-self:flex-start" data-a="actanew" data-ev="'+ev.id+'" data-date="'+sel.date+'">'+ic('plus',16)+'Crear el acta</button>';
+      h+='</section>';
     } else if(ev.notes){h+='<section class="card pad24"><div class="comment">'+esc(ev.notes)+'</div></section>';}
-    var past=Object.keys(ev.actas||{}).filter(function(k){return k!==sel.date&&ev.actas[k];}).sort().reverse();
-    if(past.length)h+='<section class="card pad24" style="gap:8px"><div class="mini">Actas anteriores</div>'+past.slice(0,6).map(function(k){var dd=parseISO(k);return '<button class="sitem" data-a="calsel" data-ev="'+ev.id+'" data-date="'+k+'"><div class="st">'+esc(longDate(dd))+'</div><div class="sm">'+esc(String(ev.actas[k]).slice(0,80))+'</div></button>';}).join('')+'</section>';
+    var past=S.actas.filter(function(x){return x.evento===ev.id&&x.fecha!==sel.date;}).sort(function(x,y){return String(y.fecha).localeCompare(String(x.fecha));});
+    if(past.length)h+='<section class="card pad24" style="gap:8px"><div class="mini">Actas anteriores de esta reunión</div>'+past.slice(0,6).map(function(x){return '<a class="sitem" href="#actas" data-a="actasel" data-id="'+x.id+'"><div class="st">'+esc(actaNum(x)+' · '+aDate(x.fecha))+'</div><div class="sm">'+esc(actaSnippet(x))+'</div></a>';}).join('')+'</section>';
   }
   h+='</div></div>';
   h+='<p class="foot">Las reuniones se agendan aquí. La conexión con Google Calendar llega en la siguiente versión.</p>';
@@ -1107,7 +1271,7 @@ function vAgentes(){
 }
 
 /* ---------- render ---------- */
-var R={inicio:vInicio,metas:vMetas,productos:vProductos,lineas:vLineas,tareas:vTareas,calendario:vCalendario,agentes:vAgentes,equipo:vEquipo};
+var R={inicio:vInicio,metas:vMetas,productos:vProductos,lineas:vLineas,tareas:vTareas,calendario:vCalendario,actas:vActas,agentes:vAgentes,equipo:vEquipo};
 function render(){
   var main=document.getElementById('main');
   var ae=document.activeElement,keep=null;
@@ -1302,7 +1466,7 @@ document.addEventListener('click',function(ev){
     case 'bell':UI.bell=!UI.bell;render();return;
     case 'whoami':whoForm();return;
     case 'install':installApp();return;
-    case 'searchgo':UI.search='';if(el.dataset.k==='task')UI.taskSel=id;if(el.dataset.k==='product'){setTimeout(function(){var p=byId('products',id);if(p)productForm(p);},50);}if(el.dataset.k==='line'){setTimeout(function(){var l=byId('lines',id);if(l)lineForm(l);},50);}if(el.dataset.k==='goal'){UI.gf={modo:'todo',mes:'',ini:'',fin:''};setTimeout(function(){var g=byId('goals',id);if(g)goalForm(g);},50);}return;
+    case 'searchgo':UI.search='';if(el.dataset.k==='task')UI.taskSel=id;if(el.dataset.k==='product'){setTimeout(function(){var p=byId('products',id);if(p)productForm(p);},50);}if(el.dataset.k==='line'){setTimeout(function(){var l=byId('lines',id);if(l)lineForm(l);},50);}if(el.dataset.k==='acta'){UI.actaSel=id;UI.actaQ='';}if(el.dataset.k==='goal'){UI.gf={modo:'todo',mes:'',ini:'',fin:''};setTimeout(function(){var g=byId('goals',id);if(g)goalForm(g);},50);}return;
     case 'cleardemo':if(!confirmTwice('demo'))return;COLS.forEach(function(c){S[c].filter(function(x){return x.demo;}).forEach(function(x){store.remove(c,x.id);});});if(S.config&&S.config.demoGoals)store.setConfig({goals:[],demoGoals:false});toast('Datos de ejemplo borrados');return;
     case 'newproduct':productForm();return;
     case 'editproduct':productForm(byId('products',id));return;
@@ -1339,6 +1503,13 @@ document.addEventListener('click',function(ev){
     case 'newnote':noteForm();return;
     case 'opennote':noteForm(byId('notes',id));return;
     case 'newgoal':goalForm();return;
+    case 'newacta':actaForm();return;
+    case 'editacta':actaForm(byId('actas',id));return;
+    case 'actasel':UI.actaSel=id;if(UI.view==='actas')render();return;
+    case 'actanew':actaFromMeeting(el.dataset.ev,el.dataset.date);return;
+    case 'actaold':actaOldToTask(id,Number(el.dataset.i));return;
+    case 'actaguide':var tg=document.getElementById('actaTxt');if(!tg)return;var ga=byId('actas',id);tg.value=tg.value.trim()?tg.value.replace(/\s+$/,'')+'\n\n'+actaGuide(ga&&ga.evento&&byId('events',ga.evento)):actaGuide(ga&&ga.evento&&byId('events',ga.evento));tg.dispatchEvent(new Event('input',{bubbles:true}));tg.focus();return;
+    case 'actacopy':var ac=byId('actas',id);if(!ac)return;var txt=actaText(ac);(navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(txt):Promise.reject()).catch(function(){var ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();var ok=document.execCommand('copy');ta.remove();if(!ok)throw new Error('copy');}).then(function(){toast('Acta copiada. Pégala en WhatsApp o en un correo.');}).catch(function(){toast('No se pudo copiar');});return;
     case 'editgoal':goalForm(byId('goals',id));return;
     case 'gok':var gk=byId('goals',id);if(!gk)return;store.update('goals',id,{completada:!gk.completada});toast(gk.completada?'Meta cumplida':'Meta reabierta');return;
     case 'delgoal':if(!confirmTwice('delg'+id))return;delGoal(id);return;
@@ -1371,6 +1542,7 @@ document.addEventListener('submit',function(ev){
   var f=ev.target;ev.preventDefault();
   if(f.dataset.f==='modal'){if(modalSubmit&&modalSubmit(fdObj(f))!==false)closeModal();return;}
   if(f.dataset.f==='team'){sendTeam();return;}
+  if(f.dataset.f==='actatask'){var fv=fdObj(f);if(!fv.title)return;store.add('tasks',{title:fv.title,who:fv.who||'',priority:'Media',due:fv.due||'',product:'',stage:'',goal:'',notes:'',status:'Pendiente',comments:[],links:[],acta:f.dataset.id}).then(function(tid){if(tid){toast('Tarea acordada'+(fv.who?' para '+fv.who:''));setTimeout(function(){var i=document.getElementById('atask_t');if(i)i.focus();},60);}});f.reset();return;}
   if(f.dataset.f==='comment'){var inp=f.querySelector('input');var v=inp.value.trim();if(!v)return;var t=byId('tasks',f.dataset.id);inp.value='';store.update('tasks',t.id,{comments:(t.comments||[]).concat([{who:UI.me||'Alguien',text:v,at:new Date().toISOString()}])});return;}
 });
 document.addEventListener('keydown',function(ev){
@@ -1382,6 +1554,9 @@ document.addEventListener('input',function(ev){
   var el=ev.target;
   if(el.id==='q'){UI.search=el.value;var box=el.parentNode.querySelector('.results');var html=searchResults();if(box)box.remove();if(html)el.insertAdjacentHTML('afterend',html);return;}
   if(el.id==='msg'){UI.draft=el.value;return;}
+  if(el.id==='actaq'){UI.actaQ=el.value;render();return;}
+  if(el.id==='actaTxt'){var st2=document.getElementById('actaState');if(st2)st2.textContent='Guardando…';clearTimeout(actaTimer);var aid=el.dataset.id,av=el.value;
+    actaTimer=setTimeout(function(){if(!byId('actas',aid))return;Promise.resolve(store.update('actas',aid,{contenido:av})).then(function(){var s3=document.getElementById('actaState');if(s3)s3.innerHTML=ic('tick',14)+'Guardado';});},700);return;}
   if(el.id==='acta'){var st=document.getElementById('actaState');if(st)st.textContent='Guardando…';clearTimeout(actaTimer);var evId=el.dataset.ev,date=el.dataset.date,val=el.value;
     actaTimer=setTimeout(function(){var e=byId('events',evId);if(!e)return;var actas=Object.assign({},e.actas||{});actas[date]=val;Promise.resolve(store.update('events',evId,{actas:actas})).then(function(){var s2=document.getElementById('actaState');if(s2)s2.innerHTML=ic('tick',14)+'Guardado';});},700);}
 });
@@ -1469,7 +1644,7 @@ function subscribe(){
 var roasTimer=null,booted=false;
 function bootData(){
   hideGate();route();
-  loadAll().then(function(){moveLegacyGoals();if(!booted){booted=true;subscribe();}}).catch(function(e){console.warn(e);showGate('error','No se pudieron leer los datos del equipo.');});
+  loadAll().then(function(){moveLegacyGoals();moveLegacyActas();if(!booted){booted=true;subscribe();}}).catch(function(e){console.warn(e);showGate('error','No se pudieron leer los datos del equipo.');});
   loadRoas();loadMcp();clearInterval(roasTimer);roasTimer=setInterval(loadRoas,10*60*1000);
 }
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&ME&&ME.role!=='pendiente'&&Date.now()-lastLoad>5*60*1000){loadAll().catch(function(){});loadRoas();}});
